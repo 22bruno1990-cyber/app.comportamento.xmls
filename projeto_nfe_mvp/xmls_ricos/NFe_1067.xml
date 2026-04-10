@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe352329166138140000010678675166123340352851" versao="4.00">
+    <ide>
+      <cUF>35</cUF>
+      <cNF>64914054</cNF>
+      <natOp>Prestacao de servico</natOp>
+      <mod>55</mod>
+      <serie>1</serie>
+      <nNF>1067</nNF>
+      <dhEmi>2026-01-03T13:50:00</dhEmi>
+      <tpNF>1</tpNF>
+      <idDest>1</idDest>
+      <cMunFG>3550308</cMunFG>
+      <tpImp>1</tpImp>
+      <tpEmis>1</tpEmis>
+      <finNFe>1</finNFe>
+      <indFinal>1</indFinal>
+      <indPres>1</indPres>
+      <procEmi>0</procEmi>
+      <verProc>1.0</verProc>
+    </ide>
+
+    <emit>
+      <CNPJ>12345678000195</CNPJ>
+      <xNome>Alpha Tecnologia LTDA</xNome>
+      <enderEmit>
+        <xLgr>Rua Exemplo</xLgr>
+        <nro>699</nro>
+        <xBairro>Centro</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01000000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderEmit>
+      <IE>636122747</IE>
+      <CRT>3</CRT>
+    </emit>
+
+    <dest>
+      <CNPJ>11222333000144</CNPJ>
+      <xNome>Operadora Benefícios Saúde SA</xNome>
+      <enderDest>
+        <xLgr>Av Beneficios</xLgr>
+        <nro>1000</nro>
+        <xBairro>Paulista</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01310000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderDest>
+      <indIEDest>9</indIEDest>
+    </dest>
+
+    <det nItem="1">
+      <prod>
+        <cProd>ITEM242</cProd>
+        <xProd>Ultrassonografia</xProd>
+        <CFOP>5933</CFOP>
+        <uCom>UN</uCom>
+        <qCom>1.0000</qCom>
+        <vUnCom>4761.30</vUnCom>
+        <vProd>4761.30</vProd>
+      </prod>
+    </det>
+
+    <total>
+      <ICMSTot>
+        <vProd>4761.30</vProd>
+        <vNF>4761.30</vNF>
+      </ICMSTot>
+    </total>
+
+    <pag>
+      <detPag>
+        <tPag>90</tPag>
+        <vPag>4761.30</vPag>
+      </detPag>
+    </pag>
+
+    <infAdic>
+      <infCpl>
+usuario_envio=bruno.mendes |
+paciente=Eduardo Silva |
+cpf_paciente=88899900011 |
+prestador=Laboratório Diagnóstico Alfa |
+procedimento=Ultrassonografia |
+data_atendimento=2025-12-26 |
+evento_clinico=Retorno médico |
+guia_atendimento=GUIA535673 |
+lote=lote_01
+      </infCpl>
+    </infAdic>
+  </infNFe>
+</NFe>

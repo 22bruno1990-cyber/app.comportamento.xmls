@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe359943589136310000011687747057922718105336" versao="4.00">
+    <ide>
+      <cUF>35</cUF>
+      <cNF>67418250</cNF>
+      <natOp>Prestacao de servico</natOp>
+      <mod>55</mod>
+      <serie>1</serie>
+      <nNF>1168</nNF>
+      <dhEmi>2026-01-07T10:57:00</dhEmi>
+      <tpNF>1</tpNF>
+      <idDest>1</idDest>
+      <cMunFG>3550308</cMunFG>
+      <tpImp>1</tpImp>
+      <tpEmis>1</tpEmis>
+      <finNFe>1</finNFe>
+      <indFinal>1</indFinal>
+      <indPres>1</indPres>
+      <procEmi>0</procEmi>
+      <verProc>1.0</verProc>
+    </ide>
+
+    <emit>
+      <CNPJ>74185296000188</CNPJ>
+      <xNome>Delta Comércio LTDA</xNome>
+      <enderEmit>
+        <xLgr>Rua Exemplo</xLgr>
+        <nro>217</nro>
+        <xBairro>Centro</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01000000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderEmit>
+      <IE>839369897</IE>
+      <CRT>3</CRT>
+    </emit>
+
+    <dest>
+      <CNPJ>11222333000144</CNPJ>
+      <xNome>Operadora Benefícios Saúde SA</xNome>
+      <enderDest>
+        <xLgr>Av Beneficios</xLgr>
+        <nro>1000</nro>
+        <xBairro>Paulista</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01310000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderDest>
+      <indIEDest>9</indIEDest>
+    </dest>
+
+    <det nItem="1">
+      <prod>
+        <cProd>ITEM235</cProd>
+        <xProd>Consulta ortopédica</xProd>
+        <CFOP>5933</CFOP>
+        <uCom>UN</uCom>
+        <qCom>1.0000</qCom>
+        <vUnCom>2106.73</vUnCom>
+        <vProd>2106.73</vProd>
+      </prod>
+    </det>
+
+    <total>
+      <ICMSTot>
+        <vProd>2106.73</vProd>
+        <vNF>2106.73</vNF>
+      </ICMSTot>
+    </total>
+
+    <pag>
+      <detPag>
+        <tPag>90</tPag>
+        <vPag>2106.73</vPag>
+      </detPag>
+    </pag>
+
+    <infAdic>
+      <infCpl>
+usuario_envio=elaine.rocha |
+paciente=Patricia Alves |
+cpf_paciente=55566677788 |
+prestador=Centro Médico Avançado |
+procedimento=Consulta ortopédica |
+data_atendimento=2026-01-04 |
+evento_clinico=Retorno médico |
+guia_atendimento=GUIA250219 |
+lote=lote_02
+      </infCpl>
+    </infAdic>
+  </infNFe>
+</NFe>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe356462632204160000011245588843328030336640" versao="4.00">
+    <ide>
+      <cUF>35</cUF>
+      <cNF>69572772</cNF>
+      <natOp>Prestacao de servico</natOp>
+      <mod>55</mod>
+      <serie>1</serie>
+      <nNF>1124</nNF>
+      <dhEmi>2026-01-14T16:49:00</dhEmi>
+      <tpNF>1</tpNF>
+      <idDest>1</idDest>
+      <cMunFG>3550308</cMunFG>
+      <tpImp>1</tpImp>
+      <tpEmis>1</tpEmis>
+      <finNFe>1</finNFe>
+      <indFinal>1</indFinal>
+      <indPres>1</indPres>
+      <procEmi>0</procEmi>
+      <verProc>1.0</verProc>
+    </ide>
+
+    <emit>
+      <CNPJ>12345678000195</CNPJ>
+      <xNome>Alpha Tecnologia LTDA</xNome>
+      <enderEmit>
+        <xLgr>Rua Exemplo</xLgr>
+        <nro>510</nro>
+        <xBairro>Centro</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01000000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderEmit>
+      <IE>279587066</IE>
+      <CRT>3</CRT>
+    </emit>
+
+    <dest>
+      <CNPJ>11222333000144</CNPJ>
+      <xNome>Operadora Benefícios Saúde SA</xNome>
+      <enderDest>
+        <xLgr>Av Beneficios</xLgr>
+        <nro>1000</nro>
+        <xBairro>Paulista</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01310000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderDest>
+      <indIEDest>9</indIEDest>
+    </dest>
+
+    <det nItem="1">
+      <prod>
+        <cProd>ITEM184</cProd>
+        <xProd>Ultrassonografia</xProd>
+        <CFOP>5933</CFOP>
+        <uCom>UN</uCom>
+        <qCom>1.0000</qCom>
+        <vUnCom>6824.51</vUnCom>
+        <vProd>6824.51</vProd>
+      </prod>
+    </det>
+
+    <total>
+      <ICMSTot>
+        <vProd>6824.51</vProd>
+        <vNF>6824.51</vNF>
+      </ICMSTot>
+    </total>
+
+    <pag>
+      <detPag>
+        <tPag>90</tPag>
+        <vPag>6824.51</vPag>
+      </detPag>
+    </pag>
+
+    <infAdic>
+      <infCpl>
+usuario_envio=carla.santos |
+paciente=Camila Rocha |
+cpf_paciente=77788899900 |
+prestador=OrtoCare Especialidades |
+procedimento=Ultrassonografia |
+data_atendimento=2026-01-13 |
+evento_clinico=Exame complementar |
+guia_atendimento=GUIA182760 |
+lote=lote_04
+      </infCpl>
+    </infAdic>
+  </infNFe>
+</NFe>

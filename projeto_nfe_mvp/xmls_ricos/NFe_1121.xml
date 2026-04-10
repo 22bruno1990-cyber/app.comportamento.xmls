@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe351764011117360000011213223994076632775164" versao="4.00">
+    <ide>
+      <cUF>35</cUF>
+      <cNF>61532114</cNF>
+      <natOp>Prestacao de servico</natOp>
+      <mod>55</mod>
+      <serie>1</serie>
+      <nNF>1121</nNF>
+      <dhEmi>2026-01-12T14:19:00</dhEmi>
+      <tpNF>1</tpNF>
+      <idDest>1</idDest>
+      <cMunFG>3550308</cMunFG>
+      <tpImp>1</tpImp>
+      <tpEmis>1</tpEmis>
+      <finNFe>1</finNFe>
+      <indFinal>1</indFinal>
+      <indPres>1</indPres>
+      <procEmi>0</procEmi>
+      <verProc>1.0</verProc>
+    </ide>
+
+    <emit>
+      <CNPJ>96385274100014</CNPJ>
+      <xNome>Sigma Analytics LTDA</xNome>
+      <enderEmit>
+        <xLgr>Rua Exemplo</xLgr>
+        <nro>996</nro>
+        <xBairro>Centro</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01000000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderEmit>
+      <IE>702994164</IE>
+      <CRT>3</CRT>
+    </emit>
+
+    <dest>
+      <CNPJ>11222333000144</CNPJ>
+      <xNome>Operadora Benefícios Saúde SA</xNome>
+      <enderDest>
+        <xLgr>Av Beneficios</xLgr>
+        <nro>1000</nro>
+        <xBairro>Paulista</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01310000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderDest>
+      <indIEDest>9</indIEDest>
+    </dest>
+
+    <det nItem="1">
+      <prod>
+        <cProd>ITEM617</cProd>
+        <xProd>Consulta ortopédica</xProd>
+        <CFOP>5933</CFOP>
+        <uCom>UN</uCom>
+        <qCom>1.0000</qCom>
+        <vUnCom>3380.46</vUnCom>
+        <vProd>3380.46</vProd>
+      </prod>
+    </det>
+
+    <total>
+      <ICMSTot>
+        <vProd>3380.46</vProd>
+        <vNF>3380.46</vNF>
+      </ICMSTot>
+    </total>
+
+    <pag>
+      <detPag>
+        <tPag>90</tPag>
+        <vPag>3380.46</vPag>
+      </detPag>
+    </pag>
+
+    <infAdic>
+      <infCpl>
+usuario_envio=felipe.costa |
+paciente=Ricardo Gomes |
+cpf_paciente=66677788899 |
+prestador=Clínica Saúde Integrada |
+procedimento=Consulta ortopédica |
+data_atendimento=2026-01-10 |
+evento_clinico=Atendimento ambulatorial |
+guia_atendimento=GUIA469412 |
+lote=lote_01
+      </infCpl>
+    </infAdic>
+  </infNFe>
+</NFe>

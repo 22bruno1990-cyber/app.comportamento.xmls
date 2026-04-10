@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe353160459674880000010764548168900943737394" versao="4.00">
+    <ide>
+      <cUF>35</cUF>
+      <cNF>99213703</cNF>
+      <natOp>Prestacao de servico</natOp>
+      <mod>55</mod>
+      <serie>1</serie>
+      <nNF>1076</nNF>
+      <dhEmi>2026-01-12T15:06:00</dhEmi>
+      <tpNF>1</tpNF>
+      <idDest>1</idDest>
+      <cMunFG>3550308</cMunFG>
+      <tpImp>1</tpImp>
+      <tpEmis>1</tpEmis>
+      <finNFe>1</finNFe>
+      <indFinal>1</indFinal>
+      <indPres>1</indPres>
+      <procEmi>0</procEmi>
+      <verProc>1.0</verProc>
+    </ide>
+
+    <emit>
+      <CNPJ>12345678000195</CNPJ>
+      <xNome>Alpha Tecnologia LTDA</xNome>
+      <enderEmit>
+        <xLgr>Rua Exemplo</xLgr>
+        <nro>373</nro>
+        <xBairro>Centro</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01000000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderEmit>
+      <IE>278604592</IE>
+      <CRT>3</CRT>
+    </emit>
+
+    <dest>
+      <CNPJ>11222333000144</CNPJ>
+      <xNome>Operadora Benefícios Saúde SA</xNome>
+      <enderDest>
+        <xLgr>Av Beneficios</xLgr>
+        <nro>1000</nro>
+        <xBairro>Paulista</xBairro>
+        <cMun>3550308</cMun>
+        <xMun>Sao Paulo</xMun>
+        <UF>SP</UF>
+        <CEP>01310000</CEP>
+        <cPais>1058</cPais>
+        <xPais>Brasil</xPais>
+      </enderDest>
+      <indIEDest>9</indIEDest>
+    </dest>
+
+    <det nItem="1">
+      <prod>
+        <cProd>ITEM762</cProd>
+        <xProd>Fisioterapia</xProd>
+        <CFOP>5933</CFOP>
+        <uCom>UN</uCom>
+        <qCom>1.0000</qCom>
+        <vUnCom>3838.44</vUnCom>
+        <vProd>3838.44</vProd>
+      </prod>
+    </det>
+
+    <total>
+      <ICMSTot>
+        <vProd>3838.44</vProd>
+        <vNF>3838.44</vNF>
+      </ICMSTot>
+    </total>
+
+    <pag>
+      <detPag>
+        <tPag>90</tPag>
+        <vPag>3838.44</vPag>
+      </detPag>
+    </pag>
+
+    <infAdic>
+      <infCpl>
+usuario_envio=diego.lima |
+paciente=Patricia Alves |
+cpf_paciente=55566677788 |
+prestador=Clínica Saúde Integrada |
+procedimento=Fisioterapia |
+data_atendimento=2026-01-06 |
+evento_clinico=Sessão terapêutica |
+guia_atendimento=GUIA476395 |
+lote=lote_04
+      </infCpl>
+    </infAdic>
+  </infNFe>
+</NFe>
