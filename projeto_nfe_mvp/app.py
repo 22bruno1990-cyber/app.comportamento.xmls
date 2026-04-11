@@ -388,6 +388,17 @@ SEGMENT_COPY = {
         "upload_help": "Você pode usar seus XMLs ou acionar a demo guiada no menu lateral.",
         "demo_origin": "Demo guiada com XMLs de exemplo",
         "manual_origin": "Upload manual de {qtd} arquivo(s)",
+        "field_labels": {
+            "paciente": "paciente",
+            "cpf_paciente": "cpf_paciente",
+            "prestador": "prestador",
+            "procedimento": "procedimento",
+            "data_atendimento": "data_atendimento",
+            "evento_clinico": "evento_clinico",
+            "guia_atendimento": "guia_atendimento",
+            "top_recurrence_title": "Pacientes mais recorrentes",
+            "top_exposed_title": "Prestadores mais expostos",
+        },
     },
     "Contas a pagar": {
         "hero_title": "Revele duplicidades, fracionamentos e reapresentações antes do pagamento sair.",
@@ -431,6 +442,17 @@ SEGMENT_COPY = {
         "upload_help": "Você pode usar XMLs reais de contas a pagar ou acionar a demo guiada no menu lateral.",
         "demo_origin": "Demo guiada com XMLs de exemplo",
         "manual_origin": "Upload manual de {qtd} arquivo(s)",
+        "field_labels": {
+            "paciente": "favorecido",
+            "cpf_paciente": "doc_favorecido",
+            "prestador": "fornecedor",
+            "procedimento": "categoria_cobranca",
+            "data_atendimento": "data_referencia",
+            "evento_clinico": "natureza_evento",
+            "guia_atendimento": "referencia_interna",
+            "top_recurrence_title": "Favorecidos mais recorrentes",
+            "top_exposed_title": "Fornecedores mais expostos",
+        },
     },
 }
 
@@ -1640,8 +1662,34 @@ def resumo_categoria(df, categoria):
     }
 
 
-def build_column_config():
+def build_column_config(copy):
+    field_labels = copy["field_labels"]
     return {
+        "arquivo": st.column_config.TextColumn(
+            "arquivo",
+            help="Nome do XML processado nesta rodada.",
+        ),
+        "paciente": st.column_config.TextColumn(
+            field_labels["paciente"],
+        ),
+        "cpf_paciente": st.column_config.TextColumn(
+            field_labels["cpf_paciente"],
+        ),
+        "prestador": st.column_config.TextColumn(
+            field_labels["prestador"],
+        ),
+        "procedimento": st.column_config.TextColumn(
+            field_labels["procedimento"],
+        ),
+        "data_atendimento": st.column_config.TextColumn(
+            field_labels["data_atendimento"],
+        ),
+        "evento_clinico": st.column_config.TextColumn(
+            field_labels["evento_clinico"],
+        ),
+        "guia_atendimento": st.column_config.TextColumn(
+            field_labels["guia_atendimento"],
+        ),
         "score_tecnico": st.column_config.NumberColumn(
             "score_tecnico",
             help="Pontuação dos indícios técnicos, como XML repetido, ID da NF já visto ou chave de negócio duplicada.",
@@ -1847,7 +1895,7 @@ def render_results(df, origem, copy):
     resumo = resumo_executivo(df)
     df = df.copy()
     df["categoria_trilha"] = df["classificacao_final"].apply(categoria_trilha_risco)
-    column_config = build_column_config()
+    column_config = build_column_config(copy)
 
     st.markdown(f'### {copy["panel_title"]}')
     st.caption(f'{copy["source_prefix"]}: {origem}')
@@ -1930,10 +1978,10 @@ def render_results(df, origem, copy):
         st.markdown("#### Usuários mais recorrentes")
         st.dataframe(df["usuario_envio"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
     with t2:
-        st.markdown("#### Prestadores mais expostos")
+        st.markdown(f'#### {copy["field_labels"]["top_exposed_title"]}')
         st.dataframe(df["prestador"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
     with t3:
-        st.markdown("#### Pacientes mais recorrentes")
+        st.markdown(f'#### {copy["field_labels"]["top_recurrence_title"]}')
         st.dataframe(df["paciente"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
 
     st.markdown("### Trilha de risco")
