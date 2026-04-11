@@ -205,42 +205,6 @@ st.markdown(
         margin-top: 6px;
     }
 
-    .chart-row {
-        display: grid;
-        grid-template-columns: 110px 1fr 36px;
-        align-items: center;
-        gap: 12px;
-        margin: 12px 0;
-    }
-
-    .chart-label {
-        color: #314760;
-        font-size: 0.82rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-
-    .chart-track {
-        background: #dce6f4;
-        height: 14px;
-        border-radius: 999px;
-        overflow: hidden;
-    }
-
-    .chart-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #4778b4 0%, #79a5d8 100%);
-        border-radius: 999px;
-    }
-
-    .chart-value {
-        color: #173761;
-        font-size: 0.95rem;
-        font-weight: 800;
-        text-align: right;
-    }
-
     .risk-strip {
         background: rgba(255, 255, 255, 0.92);
         border-radius: 22px;
@@ -996,31 +960,20 @@ def render_results(df, origem):
     with a2:
         top_classificacoes = df["classificacao_final"].value_counts().head(4)
         max_valor = max(int(top_classificacoes.max()), 1) if not top_classificacoes.empty else 1
-        chart_rows = []
-        for categoria, quantidade in top_classificacoes.items():
-            largura = (int(quantidade) / max_valor) * 100
-            chart_rows.append(
-                f"""
-                <div class="chart-row">
-                    <div class="chart-label">{categoria}</div>
-                    <div class="chart-track">
-                        <div class="chart-fill" style="width:{largura:.2f}%"></div>
-                    </div>
-                    <div class="chart-value">{int(quantidade)}</div>
-                </div>
-                """
-            )
         st.markdown(
-            f"""
+            """
             <div class="panel-card">
                 <div class="chart-title">Distribuição de alertas</div>
-                <div class="chart-wrap">
-                    {"".join(chart_rows)}
-                </div>
+                <div class="chart-wrap"></div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        for categoria, quantidade in top_classificacoes.items():
+            label_col, progress_col, value_col = st.columns([1.2, 4, 0.5])
+            label_col.markdown(f"**{categoria}**")
+            progress_col.progress(int((int(quantidade) / max_valor) * 100))
+            value_col.markdown(f"**{int(quantidade)}**")
 
     r1, r2, r3 = st.columns(3)
     fraude = resumo_categoria(df, "FRAUDE FORTE")
