@@ -862,6 +862,12 @@ def classificar_final(row):
         return "REAPRESENTACAO"
     if row["nivel_risco_tecnico"] == "DUPLICIDADE":
         return "DUPLICIDADE"
+    if row["flag_crescimento_exponencial"] and row["flag_abuso_servico"]:
+        return "ABUSO + CRESCIMENTO"
+    if row["flag_crescimento_exponencial"]:
+        return "CRESCIMENTO EXPONENCIAL"
+    if row["flag_abuso_servico"]:
+        return "ABUSO DE SERVICO"
     if row["risco_comportamental"] == "COMPORTAMENTO SUSPEITO":
         return "COMPORTAMENTO SUSPEITO"
     if row["risco_comportamental"] == "ALERTA COMPORTAMENTAL":
@@ -875,6 +881,10 @@ def highlight_risco(row):
     classificacao = row["classificacao_final"]
     if classificacao == "REAPRESENTACAO":
         return ["background-color:#4e1212;color:#fff7f7"] * len(row)
+    if classificacao in {"ABUSO + CRESCIMENTO", "CRESCIMENTO EXPONENCIAL"}:
+        return ["background-color:#5f3b18;color:#fff8f1"] * len(row)
+    if classificacao == "ABUSO DE SERVICO":
+        return ["background-color:#6a5318;color:#fffdf2"] * len(row)
     if classificacao == "COMPORTAMENTO SUSPEITO":
         return ["background-color:#632323;color:#fff7f7"] * len(row)
     if classificacao == "DUPLICIDADE":
@@ -1037,7 +1047,15 @@ def resumo_executivo(df):
     reapresentacao = int((df["classificacao_final"] == "REAPRESENTACAO").sum())
     duplicidade = int((df["classificacao_final"] == "DUPLICIDADE").sum())
     comportamento = int(
-        df["classificacao_final"].isin(["COMPORTAMENTO SUSPEITO", "ALERTA COMPORTAMENTAL"]).sum()
+        df["classificacao_final"].isin(
+            [
+                "COMPORTAMENTO SUSPEITO",
+                "ALERTA COMPORTAMENTAL",
+                "ABUSO DE SERVICO",
+                "CRESCIMENTO EXPONENCIAL",
+                "ABUSO + CRESCIMENTO",
+            ]
+        ).sum()
     )
     normais = int((df["classificacao_final"] == "NORMAL").sum())
 
@@ -1053,7 +1071,18 @@ def resumo_executivo(df):
         "valor_fraude_forte": float(df.loc[df["classificacao_final"] == "REAPRESENTACAO", "valor_nf_num"].sum()),
         "valor_duplicidade": float(df.loc[df["classificacao_final"] == "DUPLICIDADE", "valor_nf_num"].sum()),
         "valor_suspeito": float(
-            df.loc[df["classificacao_final"].isin(["COMPORTAMENTO SUSPEITO", "ALERTA COMPORTAMENTAL"]), "valor_nf_num"].sum()
+            df.loc[
+                df["classificacao_final"].isin(
+                    [
+                        "COMPORTAMENTO SUSPEITO",
+                        "ALERTA COMPORTAMENTAL",
+                        "ABUSO DE SERVICO",
+                        "CRESCIMENTO EXPONENCIAL",
+                        "ABUSO + CRESCIMENTO",
+                    ]
+                ),
+                "valor_nf_num",
+            ].sum()
         ),
     }
 
@@ -1069,7 +1098,14 @@ def categoria_trilha_risco(classificacao):
         return "FRAUDE FORTE"
     if classificacao == "DUPLICIDADE":
         return "DUPLICIDADE"
-    if classificacao in {"COMPORTAMENTO SUSPEITO", "ALERTA COMPORTAMENTAL", "ALERTA"}:
+    if classificacao in {
+        "COMPORTAMENTO SUSPEITO",
+        "ALERTA COMPORTAMENTAL",
+        "ALERTA",
+        "ABUSO DE SERVICO",
+        "CRESCIMENTO EXPONENCIAL",
+        "ABUSO + CRESCIMENTO",
+    }:
         return "SUSPEITO"
     return "NORMAL"
 
