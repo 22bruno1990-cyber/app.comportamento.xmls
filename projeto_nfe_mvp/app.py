@@ -512,6 +512,113 @@ def enrich_historico(df):
     return df
 
 
+def carregar_referencias_crescimento(df):
+    referencias = {}
+    grupos = (
+        df[["prestador", "procedimento"]]
+        .dropna()
+        .drop_duplicates()
+        .to_dict(orient="records")
+    )
+
+    with get_db_connection() as conn:
+        for grupo in grupos:
+            prestador = grupo["prestador"]
+            procedimento = grupo["procedimento"]
+            if not prestador or not procedimento:
+                continue
+
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_registros,
+                    AVG(qtd_lote) AS media_qtd_lote,
+                    AVG(valor_medio_lote) AS media_valor_lote
+                FROM (
+                    SELECT
+                        lote,
+                        COUNT(*) AS qtd_lote,
+                        AVG(valor_nf_num) AS valor_medio_lote
+                    FROM nfe_documents
+                    WHERE prestador = ?
+                      AND procedimento = ?
+                      AND lote <> ''
+                      AND valor_nf_num > 0
+                    GROUP BY lote
+                ) base
+                """,
+                (prestador, procedimento),
+            ).fetchone()
+
+            referencias[(prestador, procedimento)] = {
+                "total_registros": int(row["total_registros"] or 0),
+                "media_qtd_lote": float(row["media_qtd_lote"] or 0),
+                "media_valor_lote": float(row["media_valor_lote"] or 0),
+            }
+
+    return referencias
+
+
+def enrich_advanced_patterns(df):
+    if df.empty:
+        return df
+
+    df["procedimento_ref_qtd"] = df.groupby("procedimento")["arquivo"].transform("count")
+    df["procedimento_ref_mediana"] = df.groupby("procedimento")["valor_nf_num"].transform("median")
+    df["procedimento_ref_media"] = df.groupby("procedimento")["valor_nf_num"].transform("mean")
+
+    df["abuso_servico_pct"] = 0.0
+    mascara_abuso = (
+        (df["procedimento"] != "")
+        & (df["procedimento_ref_qtd"] >= 4)
+        & (df["procedimento_ref_mediana"] > 0)
+        & (df["valor_nf_num"] >= df["procedimento_ref_mediana"] * 1.7)
+        & ((df["valor_nf_num"] - df["procedimento_ref_mediana"]) >= 200)
+    )
+    df.loc[mascara_abuso, "abuso_servico_pct"] = (
+        ((df.loc[mascara_abuso, "valor_nf_num"] / df.loc[mascara_abuso, "procedimento_ref_mediana"]) - 1) * 100
+    ).round(1)
+    df["flag_abuso_servico"] = mascara_abuso
+
+    df["grupo_prestador_proc_lote_qtd"] = df.groupby(["prestador", "procedimento", "lote"])["arquivo"].transform("count")
+    df["grupo_prestador_proc_lote_valor_medio"] = df.groupby(["prestador", "procedimento", "lote"])["valor_nf_num"].transform("mean")
+
+    referencias = carregar_referencias_crescimento(df)
+    hist_media_qtd_lote = []
+    hist_media_valor_lote = []
+    crescimento_pct = []
+    flag_crescimento = []
+
+    for _, row in df.iterrows():
+        referencia = referencias.get((row["prestador"], row["procedimento"]), {})
+        media_qtd = float(referencia.get("media_qtd_lote", 0))
+        media_valor = float(referencia.get("media_valor_lote", 0))
+
+        qtd_atual = float(row["grupo_prestador_proc_lote_qtd"] or 0)
+        valor_atual = float(row["grupo_prestador_proc_lote_valor_medio"] or 0)
+
+        volume_semelhante = media_qtd >= 3 and qtd_atual >= 3 and qtd_atual >= media_qtd * 0.7 and qtd_atual <= media_qtd * 1.3
+        aumento_desproporcional = media_valor > 0 and valor_atual >= media_valor * 1.6
+        crescimento_flag = bool(
+            row["prestador"]
+            and row["procedimento"]
+            and row["lote"]
+            and volume_semelhante
+            and aumento_desproporcional
+        )
+
+        hist_media_qtd_lote.append(round(media_qtd, 2))
+        hist_media_valor_lote.append(round(media_valor, 2))
+        crescimento_pct.append(round(((valor_atual / media_valor) - 1) * 100, 1) if media_valor > 0 else 0.0)
+        flag_crescimento.append(crescimento_flag)
+
+    df["hist_media_qtd_lote"] = hist_media_qtd_lote
+    df["hist_media_valor_lote"] = hist_media_valor_lote
+    df["crescimento_pct"] = crescimento_pct
+    df["flag_crescimento_exponencial"] = flag_crescimento
+    return df
+
+
 def salvar_lote_no_historico(df, origem_upload):
     inicializar_banco()
     colunas = [
@@ -667,6 +774,18 @@ def calcular_score_tecnico(row):
 def calcular_score_comportamental(row):
     score = 0
     motivos = []
+
+    if row["flag_crescimento_exponencial"]:
+        score += 55
+        motivos.append(
+            f'Crescimento exponencial do ticket medio (+{row["crescimento_pct"]:.1f}%) com volume semelhante'
+        )
+
+    if row["flag_abuso_servico"]:
+        score += 45
+        motivos.append(
+            f'Abuso de serviço: valor {row["abuso_servico_pct"]:.1f}% acima da mediana do procedimento'
+        )
 
     if row["hist_behavior_count"] >= 1 and not row["dup_hash"]:
         score += 35
@@ -827,6 +946,7 @@ def processar_arquivos(arquivos):
     )["arquivo"].transform("count")
     df["grupo_cpf_data"] = df.groupby(["cpf_paciente", "data_atendimento"])["arquivo"].transform("count")
     df["grupo_prestador_data"] = df.groupby(["prestador", "data_atendimento"])["arquivo"].transform("count")
+    df = enrich_advanced_patterns(df)
 
     df[["score_comportamental", "risco_comportamental", "motivo_comportamental"]] = df.apply(
         calcular_score_comportamental,
@@ -946,8 +1066,9 @@ def render_pitch():
             <div class="glass-card">
                 <div class="section-title">Solução</div>
                 <div class="section-copy">
-                    O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico e prioriza os casos
-                    com maior chance de perda financeira.
+                    O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico,
+                    detecta abuso de serviço e crescimento exponencial, e prioriza os casos com maior
+                    chance de perda financeira.
                 </div>
             </div>
             """,
@@ -1112,6 +1233,8 @@ def render_results(df, origem):
         "score_comportamental",
         "score_final",
         "classificacao_final",
+        "flag_abuso_servico",
+        "flag_crescimento_exponencial",
         "categoria_trilha",
         "motivo_historico",
         "motivo_tecnico",
@@ -1142,6 +1265,14 @@ def render_results(df, origem):
         "score_comportamental",
         "risco_comportamental",
         "motivo_comportamental",
+        "flag_abuso_servico",
+        "abuso_servico_pct",
+        "procedimento_ref_mediana",
+        "procedimento_ref_media",
+        "flag_crescimento_exponencial",
+        "crescimento_pct",
+        "hist_media_qtd_lote",
+        "hist_media_valor_lote",
         "score_final",
         "classificacao_final",
         "ja_visto_historico",
