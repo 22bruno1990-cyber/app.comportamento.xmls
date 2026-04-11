@@ -1466,6 +1466,7 @@ def resumo_executivo(df):
             [
                 "COMPORTAMENTO SUSPEITO",
                 "ALERTA COMPORTAMENTAL",
+                "ALERTA",
                 "ESTETICO CAMUFLADO",
                 "ESTETICO + QUEBRA",
                 "ABUSO DE SERVICO",
@@ -1496,6 +1497,7 @@ def resumo_executivo(df):
                     [
                         "COMPORTAMENTO SUSPEITO",
                         "ALERTA COMPORTAMENTAL",
+                        "ALERTA",
                         "ESTETICO CAMUFLADO",
                         "ESTETICO + QUEBRA",
                         "ABUSO DE SERVICO",
