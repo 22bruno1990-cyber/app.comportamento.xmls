@@ -586,6 +586,38 @@ def carregar_referencias_crescimento(df):
     return referencias
 
 
+def carregar_referencias_quebra(df):
+    referencias = {}
+    grupos = (
+        df[["prestador", "procedimento"]]
+        .dropna()
+        .drop_duplicates()
+        .to_dict(orient="records")
+    )
+
+    with get_db_connection() as conn:
+        for grupo in grupos:
+            prestador = grupo["prestador"]
+            procedimento = grupo["procedimento"]
+            if not prestador or not procedimento:
+                continue
+
+            row = conn.execute(
+                """
+                SELECT MAX(valor_nf_num) AS max_valor
+                FROM nfe_documents
+                WHERE prestador = ?
+                  AND procedimento = ?
+                  AND valor_nf_num > 0
+                """,
+                (prestador, procedimento),
+            ).fetchone()
+
+            referencias[(prestador, procedimento)] = float(row["max_valor"] or 0)
+
+    return referencias
+
+
 def enrich_advanced_patterns(df):
     if df.empty:
         return df
@@ -633,8 +665,13 @@ def enrich_advanced_patterns(df):
     df["grupo_prestador_proc_lote_qtd"] = df.groupby(["prestador", "procedimento", "lote"])["arquivo"].transform("count")
     df["grupo_prestador_proc_lote_valor_medio"] = df.groupby(["prestador", "procedimento", "lote"])["valor_nf_num"].transform("mean")
     df["flag_crescimento_lote_atual"] = False
+    df["quebra_nf_fator"] = 0
+    df["valor_referencia_quebra"] = 0.0
+    df["quebra_nf_gap_pct"] = 0.0
+    df["flag_quebra_nf"] = False
 
     referencias = carregar_referencias_crescimento(df)
+    referencias_quebra = carregar_referencias_quebra(df)
     hist_media_qtd_lote = []
     hist_media_valor_lote = []
     crescimento_pct = []
@@ -695,6 +732,65 @@ def enrich_advanced_patterns(df):
                 df.at[idx, "crescimento_pct"] = referencia_lote_atual[chave]
             if df.at[idx, "flag_crescimento_exponencial"] is False:
                 df.at[idx, "flag_crescimento_exponencial"] = True
+
+    # Detecta possível quebra / fracionamento de NF em 2x, 3x ou 4x
+    grupos_quebra = (
+        df.groupby(["prestador", "procedimento", "lote"], dropna=False)
+        .agg(
+            valor_max_lote=("valor_nf_num", "max"),
+            qtd_lote=("arquivo", "count"),
+        )
+        .reset_index()
+    )
+    referencia_quebra_lote = {}
+    for _, linha in grupos_quebra.iterrows():
+        chave = (linha["prestador"], linha["procedimento"], linha["lote"])
+        historico_max = referencias_quebra.get((linha["prestador"], linha["procedimento"]), 0.0)
+        referencia_quebra_lote[chave] = max(float(linha["valor_max_lote"] or 0), float(historico_max or 0))
+
+    for prestador, procedimento, lote in grupos_quebra[["prestador", "procedimento", "lote"]].itertuples(index=False, name=None):
+        if not prestador or not procedimento or not lote:
+            continue
+
+        mascara_grupo = (
+            (df["prestador"] == prestador)
+            & (df["procedimento"] == procedimento)
+            & (df["lote"] == lote)
+        )
+        referencia = referencia_quebra_lote.get((prestador, procedimento, lote), 0.0)
+        if referencia < 300:
+            continue
+
+        base_grupo = df.loc[mascara_grupo].copy()
+        if len(base_grupo) < 3:
+            continue
+
+        for fator in (2, 3, 4):
+            alvo = referencia / fator
+            tolerancia = alvo * 0.12
+            candidatos_idx = base_grupo.index[
+                (base_grupo["valor_nf_num"] > 0)
+                & (base_grupo["valor_nf_num"] < referencia * 0.85)
+                & ((base_grupo["valor_nf_num"] - alvo).abs() <= tolerancia)
+            ].tolist()
+            if len(candidatos_idx) < fator:
+                continue
+
+            sobrenomes = (
+                df.loc[candidatos_idx, "sobrenome_paciente"]
+                .replace("", pd.NA)
+                .dropna()
+            )
+            possui_familia = not sobrenomes.empty and sobrenomes.nunique() < len(sobrenomes)
+            if not possui_familia:
+                continue
+
+            for idx in candidatos_idx:
+                gap_pct = abs((df.at[idx, "valor_nf_num"] / alvo) - 1) * 100 if alvo > 0 else 0
+                df.at[idx, "flag_quebra_nf"] = True
+                df.at[idx, "quebra_nf_fator"] = fator
+                df.at[idx, "valor_referencia_quebra"] = round(referencia, 2)
+                df.at[idx, "quebra_nf_gap_pct"] = round(gap_pct, 1)
 
     return df
 
@@ -861,6 +957,12 @@ def calcular_score_comportamental(row):
             "Possível tratamento estético camuflado: prestador com indício estético e grupo familiar no mesmo lote"
         )
 
+    if row["flag_quebra_nf"]:
+        score += 58
+        motivos.append(
+            f'Possível quebra de NF: valor compatível com fracionamento em {int(row["quebra_nf_fator"])}x da referência de {formatar_brl(row["valor_referencia_quebra"])}'
+        )
+
     if row["flag_crescimento_exponencial"]:
         score += 55
         origem_crescimento = "no lote atual" if row.get("flag_crescimento_lote_atual") else "vs. histórico"
@@ -918,6 +1020,14 @@ def classificar_final(row):
         return "REAPRESENTACAO"
     if row["nivel_risco_tecnico"] == "DUPLICIDADE":
         return "DUPLICIDADE"
+    if row["flag_estetico_camuflado"] and row["flag_quebra_nf"]:
+        return "ESTETICO + QUEBRA"
+    if row["flag_quebra_nf"] and row["flag_crescimento_exponencial"]:
+        return "QUEBRA + CRESCIMENTO"
+    if row["flag_quebra_nf"] and row["flag_abuso_servico"]:
+        return "QUEBRA + ABUSO"
+    if row["flag_quebra_nf"]:
+        return "QUEBRA DE NF"
     if row["flag_estetico_camuflado"]:
         return "ESTETICO CAMUFLADO"
     if row["flag_crescimento_exponencial"] and row["flag_abuso_servico"]:
@@ -939,6 +1049,8 @@ def highlight_risco(row):
     classificacao = row["classificacao_final"]
     if classificacao == "REAPRESENTACAO":
         return ["background-color:#4e1212;color:#fff7f7"] * len(row)
+    if classificacao in {"ESTETICO + QUEBRA", "QUEBRA + CRESCIMENTO", "QUEBRA + ABUSO", "QUEBRA DE NF"}:
+        return ["background-color:#3f2a67;color:#f7f4ff"] * len(row)
     if classificacao == "ESTETICO CAMUFLADO":
         return ["background-color:#53376a;color:#fff7ff"] * len(row)
     if classificacao in {"ABUSO + CRESCIMENTO", "CRESCIMENTO EXPONENCIAL"}:
@@ -1139,6 +1251,141 @@ def carregar_demo(limit=24):
             ]
         )
 
+    base_quebra_1 = todos.get("NFe_1002.xml")
+    base_quebra_2 = todos.get("NFe_1005.xml")
+    base_quebra_3 = todos.get("NFe_1006.xml")
+    if base_quebra_1 and base_quebra_2 and base_quebra_3:
+        demo_files.extend(
+            [
+                {
+                    "name": "DEMO_QUEBRA_BASE_01.xml",
+                    "content": ajustar_xml(
+                        base_quebra_1.read_bytes(),
+                        novo_valor=500.0,
+                        novo_lote="lote_quebra_nf",
+                        novo_emitente="Clinica Prime Derma",
+                        overrides_inf_cpl={
+                            "paciente": "Patricia Costa",
+                            "cpf_paciente": "55511122233",
+                            "prestador": "Clinica Prime Derma",
+                            "procedimento": "Consulta dermatologica",
+                            "data_atendimento": "2026-02-10",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR001",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_QUEBRA_MEIO_01.xml",
+                    "content": ajustar_xml(
+                        base_quebra_2.read_bytes(),
+                        novo_valor=250.0,
+                        novo_lote="lote_quebra_nf",
+                        novo_emitente="Clinica Prime Derma",
+                        overrides_inf_cpl={
+                            "paciente": "Marcos Costa",
+                            "cpf_paciente": "55511122244",
+                            "prestador": "Clinica Prime Derma",
+                            "procedimento": "Consulta dermatologica",
+                            "data_atendimento": "2026-02-10",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR002",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_QUEBRA_MEIO_02.xml",
+                    "content": ajustar_xml(
+                        base_quebra_3.read_bytes(),
+                        novo_valor=250.0,
+                        novo_lote="lote_quebra_nf",
+                        novo_emitente="Clinica Prime Derma",
+                        overrides_inf_cpl={
+                            "paciente": "Renata Costa",
+                            "cpf_paciente": "55511122255",
+                            "prestador": "Clinica Prime Derma",
+                            "procedimento": "Consulta dermatologica",
+                            "data_atendimento": "2026-02-10",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR003",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_QUEBRA_BASE_02.xml",
+                    "content": ajustar_xml(
+                        base_quebra_1.read_bytes(),
+                        novo_valor=600.0,
+                        novo_lote="lote_quebra_nf_tripla",
+                        novo_emitente="Centro Nutri Care",
+                        overrides_inf_cpl={
+                            "paciente": "Luciana Pereira",
+                            "cpf_paciente": "66622233344",
+                            "prestador": "Centro Nutri Care",
+                            "procedimento": "Consulta nutricional",
+                            "data_atendimento": "2026-02-12",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR004",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_QUEBRA_TERCO_01.xml",
+                    "content": ajustar_xml(
+                        base_quebra_2.read_bytes(),
+                        novo_valor=200.0,
+                        novo_lote="lote_quebra_nf_tripla",
+                        novo_emitente="Centro Nutri Care",
+                        overrides_inf_cpl={
+                            "paciente": "Ricardo Pereira",
+                            "cpf_paciente": "66622233355",
+                            "prestador": "Centro Nutri Care",
+                            "procedimento": "Consulta nutricional",
+                            "data_atendimento": "2026-02-12",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR005",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_QUEBRA_TERCO_02.xml",
+                    "content": ajustar_xml(
+                        base_quebra_3.read_bytes(),
+                        novo_valor=200.0,
+                        novo_lote="lote_quebra_nf_tripla",
+                        novo_emitente="Centro Nutri Care",
+                        overrides_inf_cpl={
+                            "paciente": "Fernanda Pereira",
+                            "cpf_paciente": "66622233366",
+                            "prestador": "Centro Nutri Care",
+                            "procedimento": "Consulta nutricional",
+                            "data_atendimento": "2026-02-12",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR006",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_QUEBRA_TERCO_03.xml",
+                    "content": ajustar_xml(
+                        base_quebra_1.read_bytes(),
+                        novo_valor=200.0,
+                        novo_lote="lote_quebra_nf_tripla",
+                        novo_emitente="Centro Nutri Care",
+                        overrides_inf_cpl={
+                            "paciente": "Tiago Pereira",
+                            "cpf_paciente": "66622233377",
+                            "prestador": "Centro Nutri Care",
+                            "procedimento": "Consulta nutricional",
+                            "data_atendimento": "2026-02-12",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAQBR007",
+                        },
+                    ),
+                },
+            ]
+        )
+
     return demo_files
 
 
@@ -1220,9 +1467,13 @@ def resumo_executivo(df):
                 "COMPORTAMENTO SUSPEITO",
                 "ALERTA COMPORTAMENTAL",
                 "ESTETICO CAMUFLADO",
+                "ESTETICO + QUEBRA",
                 "ABUSO DE SERVICO",
                 "CRESCIMENTO EXPONENCIAL",
                 "ABUSO + CRESCIMENTO",
+                "QUEBRA DE NF",
+                "QUEBRA + ABUSO",
+                "QUEBRA + CRESCIMENTO",
             ]
         ).sum()
     )
@@ -1246,9 +1497,13 @@ def resumo_executivo(df):
                         "COMPORTAMENTO SUSPEITO",
                         "ALERTA COMPORTAMENTAL",
                         "ESTETICO CAMUFLADO",
+                        "ESTETICO + QUEBRA",
                         "ABUSO DE SERVICO",
                         "CRESCIMENTO EXPONENCIAL",
                         "ABUSO + CRESCIMENTO",
+                        "QUEBRA DE NF",
+                        "QUEBRA + ABUSO",
+                        "QUEBRA + CRESCIMENTO",
                     ]
                 ),
                 "valor_nf_num",
@@ -1273,9 +1528,13 @@ def categoria_trilha_risco(classificacao):
         "ALERTA COMPORTAMENTAL",
         "ALERTA",
         "ESTETICO CAMUFLADO",
+        "ESTETICO + QUEBRA",
         "ABUSO DE SERVICO",
         "CRESCIMENTO EXPONENCIAL",
         "ABUSO + CRESCIMENTO",
+        "QUEBRA DE NF",
+        "QUEBRA + ABUSO",
+        "QUEBRA + CRESCIMENTO",
     }:
         return "SUSPEITO"
     return "NORMAL"
@@ -1303,7 +1562,7 @@ def build_column_config():
         ),
         "score_comportamental": st.column_config.NumberColumn(
             "score_comportamental",
-            help="Pontuação dos padrões suspeitos de comportamento, como abuso de serviço, crescimento exponencial ou possível estético camuflado.",
+            help="Pontuação dos padrões suspeitos de comportamento, como abuso de serviço, crescimento exponencial, quebra de NF ou possível estético camuflado.",
             format="%d",
         ),
         "risco_comportamental": st.column_config.TextColumn(
@@ -1317,7 +1576,7 @@ def build_column_config():
         ),
         "classificacao_final": st.column_config.TextColumn(
             "classificacao_final",
-            help="Resultado final priorizado do caso: duplicidade, reapresentação, abuso de serviço, crescimento exponencial, estético camuflado ou normal.",
+            help="Resultado final priorizado do caso: duplicidade, reapresentação, abuso de serviço, crescimento exponencial, quebra de NF, estético camuflado ou normal.",
         ),
         "motivo_tecnico": st.column_config.TextColumn(
             "motivo_tecnico",
@@ -1343,6 +1602,25 @@ def build_column_config():
         "flag_crescimento_exponencial": st.column_config.CheckboxColumn(
             "flag_crescimento_exponencial",
             help="Marca crescimento desproporcional do ticket médio com volume semelhante.",
+        ),
+        "flag_quebra_nf": st.column_config.CheckboxColumn(
+            "flag_quebra_nf",
+            help="Marca possível fracionamento de uma cobrança em 2x, 3x ou 4x dentro do mesmo contexto de prestador e procedimento.",
+        ),
+        "quebra_nf_fator": st.column_config.NumberColumn(
+            "quebra_nf_fator",
+            help="Indica em quantas partes a cobrança parece ter sido quebrada.",
+            format="%d",
+        ),
+        "valor_referencia_quebra": st.column_config.NumberColumn(
+            "valor_referencia_quebra",
+            help="Maior valor de referência usado para detectar o possível fracionamento da cobrança.",
+            format="R$ %.2f",
+        ),
+        "quebra_nf_gap_pct": st.column_config.NumberColumn(
+            "quebra_nf_gap_pct",
+            help="Diferença percentual entre o valor encontrado e a fração esperada da referência.",
+            format="%.1f%%",
         ),
         "flag_estetico_camuflado": st.column_config.CheckboxColumn(
             "flag_estetico_camuflado",
@@ -1442,7 +1720,7 @@ def render_pitch():
                 <div class="section-title">Solução</div>
                 <div class="section-copy">
                     O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico,
-                    detecta abuso de serviço, crescimento exponencial e possível estético camuflado,
+                    detecta abuso de serviço, crescimento exponencial, quebra de NF e possível estético camuflado,
                     e prioriza os casos com maior chance de perda financeira.
                 </div>
             </div>
@@ -1551,6 +1829,7 @@ def render_results(df, origem):
     st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
     st.info(
         "Legenda rápida: abuso de serviço = valor acima da mediana do procedimento; "
+        "quebra de NF = fracionamento do valor em 2x, 3x ou 4x dentro do mesmo contexto; "
         "crescimento exponencial = salto do ticket médio com volume semelhante; "
         "estético camuflado = indício estético no prestador + grupo familiar concentrado no mesmo lote."
     )
@@ -1624,6 +1903,7 @@ def render_results(df, origem):
         "classificacao_final",
         "flag_abuso_servico",
         "flag_crescimento_exponencial",
+        "flag_quebra_nf",
         "flag_estetico_camuflado",
         "categoria_trilha",
         "motivo_historico",
@@ -1660,6 +1940,10 @@ def render_results(df, origem):
         "procedimento_ref_mediana",
         "procedimento_ref_media",
         "flag_crescimento_exponencial",
+        "flag_quebra_nf",
+        "quebra_nf_fator",
+        "valor_referencia_quebra",
+        "quebra_nf_gap_pct",
         "flag_estetico_camuflado",
         "flag_crescimento_lote_atual",
         "crescimento_pct",
