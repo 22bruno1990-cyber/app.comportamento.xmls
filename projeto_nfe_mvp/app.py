@@ -1979,10 +1979,16 @@ def render_results(df, origem, copy):
         st.dataframe(df["usuario_envio"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
     with t2:
         st.markdown(f'#### {copy["field_labels"]["top_exposed_title"]}')
-        st.dataframe(df["prestador"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
+        top_prestadores = df["prestador"].replace("", "Não informado").value_counts().head(5)
+        top_prestadores.index.name = copy["field_labels"]["prestador"]
+        top_prestadores.name = "quantidade"
+        st.dataframe(top_prestadores, use_container_width=True)
     with t3:
         st.markdown(f'#### {copy["field_labels"]["top_recurrence_title"]}')
-        st.dataframe(df["paciente"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
+        top_recorrentes = df["paciente"].replace("", "Não informado").value_counts().head(5)
+        top_recorrentes.index.name = copy["field_labels"]["paciente"]
+        top_recorrentes.name = "quantidade"
+        st.dataframe(top_recorrentes, use_container_width=True)
 
     st.markdown("### Trilha de risco")
     st.caption(copy["risk_caption"])
