@@ -196,6 +196,10 @@ st.markdown(
         height: 1.6rem;
     }
 
+    .section-gap-lg {
+        height: 3.1rem;
+    }
+
     .summary-title,
     .chart-title {
         color: #152b4c;
@@ -1037,7 +1041,7 @@ def render_results(df, origem):
             unsafe_allow_html=True,
         )
 
-    st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-gap-lg"></div>', unsafe_allow_html=True)
 
     r1, r2, r3 = st.columns(3)
     fraude = resumo_categoria(df, "FRAUDE FORTE")
