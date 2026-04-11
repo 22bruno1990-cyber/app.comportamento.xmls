@@ -144,11 +144,11 @@ st.markdown(
         opacity: 0.92;
     }
 
-    .blue { background: linear-gradient(135deg, #163660 0%, #1e5ea8 100%); }
-    .red { background: linear-gradient(135deg, #5a1212 0%, #b02a2a 100%); }
-    .orange { background: linear-gradient(135deg, #6b3a11 0%, #d97822 100%); }
-    .gold { background: linear-gradient(135deg, #5b4a13 0%, #d0a11f 100%); }
-    .green { background: linear-gradient(135deg, #0f5132 0%, #198754 100%); }
+    .blue { background: linear-gradient(135deg, #173761 0%, #275ea7 100%); }
+    .red { background: linear-gradient(135deg, #102947 0%, #1a4778 100%); }
+    .orange { background: linear-gradient(135deg, #22466f 0%, #3e78b8 100%); }
+    .gold { background: linear-gradient(135deg, #35567f 0%, #5d89bf 100%); }
+    .green { background: linear-gradient(135deg, #496b96 0%, #7ca4d5 100%); }
 
     .insight-box {
         border-left: 5px solid #1e5ea8;
@@ -965,7 +965,7 @@ def render_results(df, origem):
         valor_categoria = float(df.loc[df["categoria_trilha"] == categoria, "valor_nf_num"].sum())
         st.markdown(
             f"""
-            <div class="risk-strip" style="border-left:6px solid {'#b02a2a' if classe == 'red' else '#d0a11f' if classe == 'gold' else '#d97822'};">
+            <div class="risk-strip" style="border-left:6px solid {'#1a4778' if classe == 'red' else '#5d89bf' if classe == 'gold' else '#3e78b8'};">
                 <div class="risk-strip-title">{categoria}</div>
                 <div class="risk-strip-value">{len(dados_categoria)} caso(s) · {formatar_brl(valor_categoria)}</div>
                 <div class="risk-strip-copy">{descricao}.</div>
