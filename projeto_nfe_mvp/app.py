@@ -4,7 +4,6 @@ from pathlib import Path
 import sqlite3
 import xml.etree.ElementTree as ET
 
-import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -186,6 +185,48 @@ st.markdown(
 
     .chart-wrap {
         margin-top: 8px;
+    }
+
+    .mini-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 8px;
+    }
+
+    .mini-bar-row {
+        display: grid;
+        grid-template-columns: 110px 1fr 44px;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .mini-bar-label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #26415f;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .mini-bar-track {
+        height: 10px;
+        border-radius: 999px;
+        background: #dce6f4;
+        overflow: hidden;
+    }
+
+    .mini-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #4474ad 0%, #7ea8d6 100%);
+    }
+
+    .mini-bar-value {
+        font-size: 0.86rem;
+        font-weight: 800;
+        color: #173761;
+        text-align: right;
     }
 
     .risk-strip {
@@ -939,12 +980,21 @@ def render_results(df, origem):
         )
     with a2:
         top_classificacoes = df["classificacao_final"].value_counts().head(4)
-        chart_data = pd.DataFrame(
-            {
-                "categoria": top_classificacoes.index,
-                "quantidade": top_classificacoes.values,
-            }
-        )
+        max_valor = max(top_classificacoes.max(), 1) if not top_classificacoes.empty else 1
+        barras = []
+        for categoria, quantidade in top_classificacoes.items():
+            largura = (quantidade / max_valor) * 100
+            barras.append(
+                f"""
+                <div class="mini-bar-row">
+                    <div class="mini-bar-label">{categoria}</div>
+                    <div class="mini-bar-track">
+                        <div class="mini-bar-fill" style="width:{largura:.2f}%"></div>
+                    </div>
+                    <div class="mini-bar-value">{int(quantidade)}</div>
+                </div>
+                """
+            )
         st.markdown(
             """
             <div class="panel-card">
@@ -953,19 +1003,7 @@ def render_results(df, origem):
             """,
             unsafe_allow_html=True,
         )
-        chart = (
-            alt.Chart(chart_data)
-            .mark_bar(size=26, cornerRadiusTopLeft=6, cornerRadiusTopRight=6, color="#5d89bf")
-            .encode(
-                x=alt.X("categoria:N", sort=None, title=None, axis=alt.Axis(labelAngle=0, labelColor="#314760")),
-                y=alt.Y("quantidade:Q", title=None, axis=alt.Axis(grid=True, tickCount=5, labelColor="#314760")),
-                tooltip=["categoria", "quantidade"],
-            )
-            .properties(height=220)
-            .configure_view(strokeOpacity=0)
-            .configure_axis(gridColor="#dce6f4", domainOpacity=0, tickOpacity=0, labelFontSize=12)
-        )
-        st.altair_chart(chart, use_container_width=True)
+        st.markdown(f'<div class="mini-bars">{"".join(barras)}</div>', unsafe_allow_html=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
     r1, r2, r3 = st.columns(3)
