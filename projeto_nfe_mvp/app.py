@@ -187,48 +187,6 @@ st.markdown(
         margin-top: 8px;
     }
 
-    .mini-bars {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        margin-top: 8px;
-    }
-
-    .mini-bar-row {
-        display: grid;
-        grid-template-columns: 110px 1fr 44px;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .mini-bar-label {
-        font-size: 0.8rem;
-        font-weight: 700;
-        color: #26415f;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-
-    .mini-bar-track {
-        height: 10px;
-        border-radius: 999px;
-        background: #dce6f4;
-        overflow: hidden;
-    }
-
-    .mini-bar-fill {
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(90deg, #4474ad 0%, #7ea8d6 100%);
-    }
-
-    .mini-bar-value {
-        font-size: 0.86rem;
-        font-weight: 800;
-        color: #173761;
-        text-align: right;
-    }
-
     .risk-strip {
         background: rgba(255, 255, 255, 0.92);
         border-radius: 22px;
@@ -980,21 +938,6 @@ def render_results(df, origem):
         )
     with a2:
         top_classificacoes = df["classificacao_final"].value_counts().head(4)
-        max_valor = max(top_classificacoes.max(), 1) if not top_classificacoes.empty else 1
-        barras = []
-        for categoria, quantidade in top_classificacoes.items():
-            largura = (quantidade / max_valor) * 100
-            barras.append(
-                f"""
-                <div class="mini-bar-row">
-                    <div class="mini-bar-label">{categoria}</div>
-                    <div class="mini-bar-track">
-                        <div class="mini-bar-fill" style="width:{largura:.2f}%"></div>
-                    </div>
-                    <div class="mini-bar-value">{int(quantidade)}</div>
-                </div>
-                """
-            )
         st.markdown(
             """
             <div class="panel-card">
@@ -1003,7 +946,12 @@ def render_results(df, origem):
             """,
             unsafe_allow_html=True,
         )
-        st.markdown(f'<div class="mini-bars">{"".join(barras)}</div>', unsafe_allow_html=True)
+        max_valor = max(int(top_classificacoes.max()), 1) if not top_classificacoes.empty else 1
+        for categoria, quantidade in top_classificacoes.items():
+            l1, l2, l3 = st.columns([1.1, 4, 0.6])
+            l1.markdown(f"**{categoria}**")
+            l2.progress(int((int(quantidade) / max_valor) * 100))
+            l3.markdown(f"**{int(quantidade)}**")
         st.markdown("</div></div>", unsafe_allow_html=True)
 
     r1, r2, r3 = st.columns(3)
