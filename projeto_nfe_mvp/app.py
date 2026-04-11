@@ -1280,7 +1280,7 @@ def render_results(df, origem):
     ]
     for categoria, classe, descricao in trilhas:
         resumo_cat = resumo_categoria(df, categoria)
-        dados_categoria = resumo_cat["top"]
+        dados_categoria = df[df["categoria_trilha"] == categoria].copy()
         valor_categoria = resumo_cat["valor"]
         quantidade_total = resumo_cat["quantidade"]
         st.markdown(
@@ -1294,8 +1294,11 @@ def render_results(df, origem):
             unsafe_allow_html=True,
         )
         if not dados_categoria.empty:
-            st.caption("Amostra dos principais casos desta categoria.")
-            st.dataframe(dados_categoria[colunas_trilha], use_container_width=True)
+            st.caption(f"Lista completa da categoria: {quantidade_total} caso(s).")
+            st.dataframe(
+                dados_categoria[colunas_trilha].sort_values(by=["score_final", "valor_nf"], ascending=[False, False]),
+                use_container_width=True,
+            )
 
     st.markdown("### Casos priorizados")
     colunas_top = [
