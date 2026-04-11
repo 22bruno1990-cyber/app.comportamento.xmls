@@ -582,6 +582,7 @@ def enrich_advanced_patterns(df):
 
     df["grupo_prestador_proc_lote_qtd"] = df.groupby(["prestador", "procedimento", "lote"])["arquivo"].transform("count")
     df["grupo_prestador_proc_lote_valor_medio"] = df.groupby(["prestador", "procedimento", "lote"])["valor_nf_num"].transform("mean")
+    df["flag_crescimento_lote_atual"] = False
 
     referencias = carregar_referencias_crescimento(df)
     hist_media_qtd_lote = []
@@ -616,6 +617,35 @@ def enrich_advanced_patterns(df):
     df["hist_media_valor_lote"] = hist_media_valor_lote
     df["crescimento_pct"] = crescimento_pct
     df["flag_crescimento_exponencial"] = flag_crescimento
+
+    # Detecta explosão entre lotes dentro da própria amostra atual
+    referencia_lote_atual = {}
+    agrupado = (
+        df.groupby(["prestador", "procedimento", "lote"], dropna=False)
+        .agg(qtd_lote=("arquivo", "count"), valor_medio=("valor_nf_num", "mean"))
+        .reset_index()
+    )
+    for (prestador, procedimento), grupo in agrupado.groupby(["prestador", "procedimento"], dropna=False):
+        grupo = grupo[(grupo["prestador"] != "") & (grupo["procedimento"] != "")]
+        if len(grupo) < 2:
+            continue
+        grupo = grupo.sort_values("valor_medio")
+        base = grupo.iloc[0]
+        topo = grupo.iloc[-1]
+        volume_semelhante = base["qtd_lote"] >= 2 and topo["qtd_lote"] >= 2 and topo["qtd_lote"] >= base["qtd_lote"] * 0.7 and topo["qtd_lote"] <= base["qtd_lote"] * 1.3
+        crescimento_desproporcional = base["valor_medio"] > 0 and topo["valor_medio"] >= base["valor_medio"] * 1.8
+        if volume_semelhante and crescimento_desproporcional:
+            referencia_lote_atual[(prestador, procedimento, topo["lote"])] = round(((topo["valor_medio"] / base["valor_medio"]) - 1) * 100, 1)
+
+    for idx, row in df.iterrows():
+        chave = (row["prestador"], row["procedimento"], row["lote"])
+        if chave in referencia_lote_atual:
+            df.at[idx, "flag_crescimento_lote_atual"] = True
+            if df.at[idx, "crescimento_pct"] <= 0:
+                df.at[idx, "crescimento_pct"] = referencia_lote_atual[chave]
+            if df.at[idx, "flag_crescimento_exponencial"] is False:
+                df.at[idx, "flag_crescimento_exponencial"] = True
+
     return df
 
 
@@ -777,8 +807,9 @@ def calcular_score_comportamental(row):
 
     if row["flag_crescimento_exponencial"]:
         score += 55
+        origem_crescimento = "no lote atual" if row.get("flag_crescimento_lote_atual") else "vs. histórico"
         motivos.append(
-            f'Crescimento exponencial do ticket medio (+{row["crescimento_pct"]:.1f}%) com volume semelhante'
+            f'Crescimento exponencial do ticket medio (+{row["crescimento_pct"]:.1f}%) {origem_crescimento}'
         )
 
     if row["flag_abuso_servico"]:
@@ -887,6 +918,49 @@ def carregar_demo(limit=24):
                 "content": caminho.read_bytes(),
             }
         )
+
+    # Injeta dois lotes sintéticos para demonstrar crescimento exponencial e abuso de serviço
+    def ajustar_xml(conteudo, novo_valor=None, novo_lote=None):
+        root = ET.fromstring(conteudo)
+        valor_el = root.find(".//nfe:total/nfe:ICMSTot/nfe:vNF", NAMESPACE)
+        inf_cpl_el = root.find(".//nfe:infAdic/nfe:infCpl", NAMESPACE)
+        if novo_valor is not None and valor_el is not None:
+            valor_el.text = f"{novo_valor:.2f}"
+        if novo_lote is not None and inf_cpl_el is not None and inf_cpl_el.text:
+            partes = [parte.strip() for parte in inf_cpl_el.text.replace("\n", " ").split("|")]
+            novas_partes = []
+            for parte in partes:
+                if parte.startswith("lote="):
+                    novas_partes.append(f"lote={novo_lote}")
+                elif parte:
+                    novas_partes.append(parte)
+            inf_cpl_el.text = " |\n".join(novas_partes)
+        return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+    base_crescimento = todos.get("NFe_1000.xml")
+    base_crescimento_2 = todos.get("NFe_DUP_MESMO_LOTE_1000.xml")
+    if base_crescimento and base_crescimento_2:
+        demo_files.extend(
+            [
+                {
+                    "name": "DEMO_CRESC_BASE_01.xml",
+                    "content": ajustar_xml(base_crescimento.read_bytes(), novo_valor=980.0, novo_lote="lote_demo_base"),
+                },
+                {
+                    "name": "DEMO_CRESC_BASE_02.xml",
+                    "content": ajustar_xml(base_crescimento_2.read_bytes(), novo_valor=1015.0, novo_lote="lote_demo_base"),
+                },
+                {
+                    "name": "DEMO_CRESC_ALTO_01.xml",
+                    "content": ajustar_xml(base_crescimento.read_bytes(), novo_valor=3480.0, novo_lote="lote_demo_explosao"),
+                },
+                {
+                    "name": "DEMO_CRESC_ALTO_02.xml",
+                    "content": ajustar_xml(base_crescimento_2.read_bytes(), novo_valor=3590.0, novo_lote="lote_demo_explosao"),
+                },
+            ]
+        )
+
     return demo_files
 
 
@@ -1270,6 +1344,7 @@ def render_results(df, origem):
         "procedimento_ref_mediana",
         "procedimento_ref_media",
         "flag_crescimento_exponencial",
+        "flag_crescimento_lote_atual",
         "crescimento_pct",
         "hist_media_qtd_lote",
         "hist_media_valor_lote",
