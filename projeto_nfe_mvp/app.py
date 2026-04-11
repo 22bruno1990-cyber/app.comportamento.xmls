@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import xml.etree.ElementTree as ET
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -119,29 +120,39 @@ st.markdown(
         border-radius: 22px;
         padding: 20px;
         color: white;
-        min-height: 130px;
+        min-height: 168px;
         box-shadow: 0 14px 30px rgba(20, 32, 56, 0.12);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin-bottom: 14px;
     }
 
     .metric-card .label {
-        font-size: 0.82rem;
+        font-size: 0.74rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         opacity: 0.9;
         font-weight: 700;
+        line-height: 1.25;
+        min-height: 38px;
+        word-break: normal;
+        overflow-wrap: normal;
     }
 
     .metric-card .value {
         font-size: 2.1rem;
-        margin-top: 10px;
+        margin-top: 12px;
         font-weight: 800;
         line-height: 1;
     }
 
     .metric-card .sub {
-        font-size: 0.92rem;
-        margin-top: 10px;
+        font-size: 0.86rem;
+        margin-top: 14px;
         opacity: 0.92;
+        line-height: 1.35;
+        min-height: 42px;
     }
 
     .blue { background: linear-gradient(135deg, #173761 0%, #275ea7 100%); }
@@ -161,6 +172,20 @@ st.markdown(
 
     .insight-box strong {
         color: #0d2340;
+    }
+
+    .panel-card {
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(12, 36, 68, 0.08);
+        border-radius: 22px;
+        padding: 20px 22px;
+        box-shadow: 0 10px 28px rgba(28, 48, 74, 0.08);
+        height: 100%;
+        margin-top: 10px;
+    }
+
+    .chart-wrap {
+        margin-top: 8px;
     }
 
     .risk-strip {
@@ -889,10 +914,12 @@ def render_results(df, origem):
     st.markdown(f"### Painel executivo")
     st.caption(f"Fonte analisada: {origem}")
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    render_metric(c1, "blue", "XMLs analisados", resumo["total"], "volume processado na rodada")
+    c1, c2, c3 = st.columns(3)
+    render_metric(c1, "blue", "XMLs analisados", resumo["total"], "volume processado")
     render_metric(c2, "red", "Reapresentação", resumo["reapresentacao"], "forte indício técnico")
     render_metric(c3, "orange", "Duplicidade", resumo["duplicidade"], "casos técnicos relevantes")
+
+    c4, c5, c6 = st.columns(3)
     render_metric(c4, "gold", "Comportamental", resumo["comportamento"], "padrões suspeitos")
     render_metric(c5, "blue", "Já vistos", resumo["vistos_historico"], "matches no histórico")
     render_metric(c6, "green", "Normais", resumo["normais"], "sem alerta relevante")
@@ -901,7 +928,7 @@ def render_results(df, origem):
     with a1:
         st.markdown(
             f"""
-            <div class="insight-box">
+            <div class="panel-card insight-box">
                 <strong>Resumo para decisor:</strong> {resumo["potencial_revisao"]} de {resumo["total"]} documentos
                 foram priorizados para revisão, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong>
                 em valor associado a alertas de score 60+. O histórico já reconheceu
@@ -912,15 +939,34 @@ def render_results(df, origem):
         )
     with a2:
         top_classificacoes = df["classificacao_final"].value_counts().head(4)
+        chart_data = pd.DataFrame(
+            {
+                "categoria": top_classificacoes.index,
+                "quantidade": top_classificacoes.values,
+            }
+        )
         st.markdown(
             """
-            <div class="glass-card">
-                <div class="section-title">Distribuicao de alertas</div>
+            <div class="panel-card">
+                <div class="section-title">Distribuição de alertas</div>
+                <div class="chart-wrap">
             """,
             unsafe_allow_html=True,
         )
-        st.bar_chart(top_classificacoes)
-        st.markdown("</div>", unsafe_allow_html=True)
+        chart = (
+            alt.Chart(chart_data)
+            .mark_bar(size=26, cornerRadiusTopLeft=6, cornerRadiusTopRight=6, color="#5d89bf")
+            .encode(
+                x=alt.X("categoria:N", sort=None, title=None, axis=alt.Axis(labelAngle=0, labelColor="#314760")),
+                y=alt.Y("quantidade:Q", title=None, axis=alt.Axis(grid=True, tickCount=5, labelColor="#314760")),
+                tooltip=["categoria", "quantidade"],
+            )
+            .properties(height=220)
+            .configure_view(strokeOpacity=0)
+            .configure_axis(gridColor="#dce6f4", domainOpacity=0, tickOpacity=0, labelFontSize=12)
+        )
+        st.altair_chart(chart, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
     r1, r2, r3 = st.columns(3)
     fraude = resumo_categoria(df, "FRAUDE FORTE")
