@@ -5,6 +5,7 @@ MVP em Streamlit para analise antifraude de XMLs de NF-e com foco em:
 - duplicidade tecnica
 - reapresentacao do mesmo XML
 - sinais comportamentais suspeitos
+- memoria historica para reapresentacoes futuras
 - exportacao do resultado em CSV
 
 ## Rodar localmente
@@ -30,6 +31,23 @@ O caminho mais simples para MVP publico e o Streamlit Community Cloud:
 2. criar um app novo no Streamlit Cloud
 3. apontar para o arquivo `app.py`
 4. publicar e compartilhar a URL
+
+## Memoria historica v1
+
+O app agora pode registrar cada lote analisado em um banco local SQLite.
+
+Com isso, novos XMLs passam a ser comparados nao apenas entre si, mas tambem contra o historico salvo, permitindo detectar:
+
+- XML identico ja visto antes
+- mesma NF ja processada em outro momento
+- mesma chave de negocio em lotes futuros
+- padrao recorrente de paciente + prestador + procedimento + data
+
+No app:
+
+1. rode uma analise
+2. clique em `Registrar este lote no historico`
+3. nas proximas rodadas, o painel passara a exibir matches contra a memoria historica
 
 ## Estrutura
 

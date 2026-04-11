@@ -1,6 +1,7 @@
 from datetime import datetime
 import hashlib
 from pathlib import Path
+import sqlite3
 import xml.etree.ElementTree as ET
 
 import pandas as pd
@@ -181,10 +182,242 @@ st.markdown(
 NAMESPACE = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
 BASE_DIR = Path(__file__).resolve().parent
 DEMO_DIR = BASE_DIR / "xmls_ricos"
+DB_DIR = BASE_DIR / "data"
+DB_PATH = DB_DIR / "historico_nfe.db"
 
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
+
+
+def get_db_connection():
+    DB_DIR.mkdir(exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def inicializar_banco():
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS nfe_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                arquivo TEXT,
+                hash_arquivo TEXT,
+                id_nfe TEXT,
+                numero_nf TEXT,
+                serie TEXT,
+                data_emissao TEXT,
+                cnpj_emitente TEXT,
+                razao_social_emitente TEXT,
+                cnpj_destinatario TEXT,
+                valor_nf TEXT,
+                valor_nf_num REAL,
+                usuario_envio TEXT,
+                paciente TEXT,
+                cpf_paciente TEXT,
+                prestador TEXT,
+                procedimento TEXT,
+                data_atendimento TEXT,
+                evento_clinico TEXT,
+                guia_atendimento TEXT,
+                lote TEXT,
+                score_final REAL,
+                classificacao_final TEXT,
+                origem_upload TEXT,
+                analisado_em TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_docs_hash ON nfe_documents(hash_arquivo)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_docs_id_nfe ON nfe_documents(id_nfe)")
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_docs_business
+            ON nfe_documents(numero_nf, serie, cnpj_emitente, valor_nf)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_docs_behavior
+            ON nfe_documents(cpf_paciente, prestador, procedimento, data_atendimento)
+            """
+        )
+        conn.commit()
+
+
+def load_history_stats():
+    inicializar_banco()
+    with get_db_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total_documentos,
+                COUNT(DISTINCT hash_arquivo) AS hashes_unicos,
+                COUNT(DISTINCT id_nfe) AS ids_unicos,
+                MAX(analisado_em) AS ultima_analise
+            FROM nfe_documents
+            """
+        ).fetchone()
+    return {
+        "total_documentos": row["total_documentos"] or 0,
+        "hashes_unicos": row["hashes_unicos"] or 0,
+        "ids_unicos": row["ids_unicos"] or 0,
+        "ultima_analise": row["ultima_analise"] or "Sem histórico ainda",
+    }
+
+
+def query_scalar(conn, query, params):
+    row = conn.execute(query, params).fetchone()
+    return row[0] if row and row[0] is not None else 0
+
+
+def enrich_historico(df):
+    inicializar_banco()
+    historico_cols = [
+        "hist_hash_count",
+        "hist_id_count",
+        "hist_business_count",
+        "hist_behavior_count",
+        "ja_visto_historico",
+        "motivo_historico",
+    ]
+
+    if df.empty:
+        for coluna in historico_cols:
+            df[coluna] = []
+        return df
+
+    hist_hash_count = []
+    hist_id_count = []
+    hist_business_count = []
+    hist_behavior_count = []
+    ja_visto = []
+    motivos = []
+
+    with get_db_connection() as conn:
+        for _, row in df.iterrows():
+            hash_count = query_scalar(
+                conn,
+                "SELECT COUNT(*) FROM nfe_documents WHERE hash_arquivo = ? AND hash_arquivo <> ''",
+                (row["hash_arquivo"],),
+            )
+            id_count = query_scalar(
+                conn,
+                "SELECT COUNT(*) FROM nfe_documents WHERE id_nfe = ? AND id_nfe <> ''",
+                (row["id_nfe"],),
+            )
+            business_count = query_scalar(
+                conn,
+                """
+                SELECT COUNT(*)
+                FROM nfe_documents
+                WHERE numero_nf = ?
+                  AND serie = ?
+                  AND cnpj_emitente = ?
+                  AND valor_nf = ?
+                  AND numero_nf <> ''
+                  AND cnpj_emitente <> ''
+                """,
+                (row["numero_nf"], row["serie"], row["cnpj_emitente"], row["valor_nf"]),
+            )
+            behavior_count = query_scalar(
+                conn,
+                """
+                SELECT COUNT(*)
+                FROM nfe_documents
+                WHERE cpf_paciente = ?
+                  AND prestador = ?
+                  AND procedimento = ?
+                  AND data_atendimento = ?
+                  AND cpf_paciente <> ''
+                  AND prestador <> ''
+                  AND procedimento <> ''
+                  AND data_atendimento <> ''
+                """,
+                (
+                    row["cpf_paciente"],
+                    row["prestador"],
+                    row["procedimento"],
+                    row["data_atendimento"],
+                ),
+            )
+
+            row_motivos = []
+            if hash_count:
+                row_motivos.append(f"XML já visto {hash_count}x no histórico")
+            if id_count:
+                row_motivos.append(f"ID NFe já visto {id_count}x")
+            if business_count:
+                row_motivos.append(f"Chave de negócio já vista {business_count}x")
+            if behavior_count:
+                row_motivos.append(f"Padrão paciente/prestador já visto {behavior_count}x")
+
+            hist_hash_count.append(int(hash_count))
+            hist_id_count.append(int(id_count))
+            hist_business_count.append(int(business_count))
+            hist_behavior_count.append(int(behavior_count))
+            ja_visto.append(bool(hash_count or id_count or business_count or behavior_count))
+            motivos.append(" | ".join(row_motivos) if row_motivos else "Novo no histórico")
+
+    df["hist_hash_count"] = hist_hash_count
+    df["hist_id_count"] = hist_id_count
+    df["hist_business_count"] = hist_business_count
+    df["hist_behavior_count"] = hist_behavior_count
+    df["ja_visto_historico"] = ja_visto
+    df["motivo_historico"] = motivos
+    return df
+
+
+def salvar_lote_no_historico(df, origem_upload):
+    inicializar_banco()
+    colunas = [
+        "arquivo",
+        "hash_arquivo",
+        "id_nfe",
+        "numero_nf",
+        "serie",
+        "data_emissao",
+        "cnpj_emitente",
+        "razao_social_emitente",
+        "cnpj_destinatario",
+        "valor_nf",
+        "valor_nf_num",
+        "usuario_envio",
+        "paciente",
+        "cpf_paciente",
+        "prestador",
+        "procedimento",
+        "data_atendimento",
+        "evento_clinico",
+        "guia_atendimento",
+        "lote",
+        "score_final",
+        "classificacao_final",
+    ]
+    registros = df[colunas].fillna("").to_dict(orient="records")
+
+    with get_db_connection() as conn:
+        conn.executemany(
+            """
+            INSERT INTO nfe_documents (
+                arquivo, hash_arquivo, id_nfe, numero_nf, serie, data_emissao, cnpj_emitente,
+                razao_social_emitente, cnpj_destinatario, valor_nf, valor_nf_num, usuario_envio,
+                paciente, cpf_paciente, prestador, procedimento, data_atendimento, evento_clinico,
+                guia_atendimento, lote, score_final, classificacao_final, origem_upload
+            )
+            VALUES (
+                :arquivo, :hash_arquivo, :id_nfe, :numero_nf, :serie, :data_emissao, :cnpj_emitente,
+                :razao_social_emitente, :cnpj_destinatario, :valor_nf, :valor_nf_num, :usuario_envio,
+                :paciente, :cpf_paciente, :prestador, :procedimento, :data_atendimento, :evento_clinico,
+                :guia_atendimento, :lote, :score_final, :classificacao_final, :origem_upload
+            )
+            """,
+            [{**registro, "origem_upload": origem_upload} for registro in registros],
+        )
+        conn.commit()
+    return len(registros)
 
 
 def extrair_campos_inf_cpl(texto):
@@ -246,13 +479,25 @@ def calcular_score_tecnico(row):
     score = 0
     motivos = []
 
-    if row["dup_hash"]:
+    if row["hist_hash_count"] > 0:
+        score = 100
+        motivos.append("XML idêntico já apareceu no histórico")
+    elif row["dup_hash"]:
         if row["mesmo_lote_hash"]:
             score = 60
             motivos.append("Mesmo XML reapresentado no mesmo lote")
         else:
             score = 100
             motivos.append("Mesmo XML reapresentado em lote diferente")
+    elif row["hist_id_count"] > 0 and row["hist_business_count"] > 0:
+        score = 85
+        motivos.append("Mesma NF já apareceu no histórico")
+    elif row["hist_business_count"] > 0:
+        score = 75
+        motivos.append("Chave de negócio já apareceu no histórico")
+    elif row["hist_id_count"] > 0:
+        score = 55
+        motivos.append("ID da NF já apareceu no histórico")
     elif row["dup_id_nfe"] and row["dup_chave_negocio"]:
         score = 70
         motivos.append("Mesma NF reapresentada")
@@ -280,6 +525,10 @@ def calcular_score_tecnico(row):
 def calcular_score_comportamental(row):
     score = 0
     motivos = []
+
+    if row["hist_behavior_count"] >= 1 and not row["dup_hash"]:
+        score += 35
+        motivos.append("Padrão semelhante já apareceu no histórico")
 
     if row["grupo_paciente_prestador_proc_data"] >= 2 and not row["dup_hash"]:
         score += 70
@@ -357,6 +606,7 @@ def carregar_demo(limit=24):
 
 
 def processar_arquivos(arquivos):
+    inicializar_banco()
     dados = []
 
     for arquivo in arquivos:
@@ -392,6 +642,7 @@ def processar_arquivos(arquivos):
         keep=False,
     ) & (df["numero_nf"] != "") & (df["cnpj_emitente"] != "")
     df["dup_hash"] = df.duplicated(subset=["hash_arquivo"], keep=False) & (df["hash_arquivo"] != "")
+    df = enrich_historico(df)
 
     df["grupo_hash_lote"] = df.groupby(["hash_arquivo", "lote"])["arquivo"].transform("count")
     df["mesmo_lote_hash"] = df["dup_hash"] & (df["grupo_hash_lote"] >= 2)
@@ -436,6 +687,7 @@ def resumo_executivo(df):
         "duplicidade": duplicidade,
         "comportamento": comportamento,
         "normais": normais,
+        "vistos_historico": int(df["ja_visto_historico"].sum()),
         "potencial_revisao": reapresentacao + duplicidade + comportamento,
         "valor_em_alerta": float(df.loc[df["score_final"] >= 60, "valor_nf_num"].sum()),
     }
@@ -504,7 +756,7 @@ def render_pitch():
             <div class="glass-card">
                 <div class="section-title">Solução</div>
                 <div class="section-copy">
-                    O PSL lê XMLs, cruza sinais técnicos e comportamentais e prioriza os casos
+                    O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico e prioriza os casos
                     com maior chance de perda financeira.
                 </div>
             </div>
@@ -518,7 +770,7 @@ def render_pitch():
                 <div class="section-title">Valor para comprador</div>
                 <div class="section-copy">
                     Menos revisão cega, mais foco no que merece auditoria. O resultado sai em
-                    formato operacional, pronto para investigação ou integração.
+                    formato operacional, pronto para investigação, memória histórica ou integração.
                 </div>
             </div>
             """,
@@ -548,12 +800,13 @@ def render_results(df, origem):
     st.markdown(f"### Painel executivo")
     st.caption(f"Fonte analisada: {origem}")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     render_metric(c1, "blue", "XMLs analisados", resumo["total"], "volume processado na rodada")
     render_metric(c2, "red", "Reapresentação", resumo["reapresentacao"], "forte indício técnico")
     render_metric(c3, "orange", "Duplicidade", resumo["duplicidade"], "casos técnicos relevantes")
     render_metric(c4, "gold", "Comportamental", resumo["comportamento"], "padrões suspeitos")
-    render_metric(c5, "green", "Normais", resumo["normais"], "sem alerta relevante")
+    render_metric(c5, "blue", "Já vistos", resumo["vistos_historico"], "matches no histórico")
+    render_metric(c6, "green", "Normais", resumo["normais"], "sem alerta relevante")
 
     a1, a2 = st.columns([1.2, 1])
     with a1:
@@ -562,7 +815,8 @@ def render_results(df, origem):
             <div class="insight-box">
                 <strong>Resumo para decisor:</strong> {resumo["potencial_revisao"]} de {resumo["total"]} documentos
                 foram priorizados para revisão, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong>
-                em valor associado a alertas de score 60+.
+                em valor associado a alertas de score 60+. O histórico já reconheceu
+                <strong>{resumo["vistos_historico"]}</strong> documento(s) com vínculo anterior.
             </div>
             """,
             unsafe_allow_html=True,
@@ -603,6 +857,7 @@ def render_results(df, origem):
         "score_comportamental",
         "score_final",
         "classificacao_final",
+        "motivo_historico",
         "motivo_tecnico",
         "motivo_comportamental",
     ]
@@ -633,6 +888,12 @@ def render_results(df, origem):
         "motivo_comportamental",
         "score_final",
         "classificacao_final",
+        "ja_visto_historico",
+        "motivo_historico",
+        "hist_hash_count",
+        "hist_id_count",
+        "hist_business_count",
+        "hist_behavior_count",
         "grupo_paciente_prestador_proc_data",
         "grupo_guia",
         "grupo_usuario_evento",
@@ -656,9 +917,20 @@ render_hero()
 render_pitch()
 
 with st.sidebar:
+    historico = load_history_stats()
     st.markdown("## Modo de demonstração")
     usar_demo = st.button("Carregar demo guiada", use_container_width=True)
     st.caption("A demo usa XMLs de exemplo já publicados no repositório.")
+    st.markdown("---")
+    st.markdown("## Memória do produto")
+    st.markdown(
+        f"""
+        - documentos salvos: **{historico["total_documentos"]}**
+        - hashes únicos: **{historico["hashes_unicos"]}**
+        - IDs únicos: **{historico["ids_unicos"]}**
+        - última ingestão: **{historico["ultima_analise"]}**
+        """
+    )
     st.markdown("---")
     st.markdown("## Como vender em reunião")
     st.markdown(
@@ -666,7 +938,8 @@ with st.sidebar:
         - mostre o resumo executivo;
         - abra os 10 casos priorizados;
         - destaque o valor em alerta;
-        - exporte o CSV para provar operacionalização.
+        - exporte o CSV para provar operacionalização;
+        - registre o lote no histórico para mostrar memória antifraude.
         """
     )
 
@@ -689,5 +962,8 @@ elif uploaded_files:
 
 if not df.empty:
     render_results(df, origem)
+    if st.button("Registrar este lote no histórico", use_container_width=True):
+        salvos = salvar_lote_no_historico(df, origem)
+        st.success(f"{salvos} documento(s) foram gravados no histórico antifraude.")
 else:
     render_empty_state()
