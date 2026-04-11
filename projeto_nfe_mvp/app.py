@@ -106,6 +106,14 @@ st.markdown(
         line-height: 1.55;
     }
 
+    .soft-heading {
+        color: #d7e0ee;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin: 10px 0 12px 0;
+    }
+
     .metric-card {
         border-radius: 22px;
         padding: 20px;
@@ -519,7 +527,7 @@ def render_pitch():
 
 
 def render_empty_state():
-    st.markdown("### Como demonstrar em 30 segundos")
+    st.markdown('<div class="soft-heading">Como demonstrar em 30 segundos</div>', unsafe_allow_html=True)
     st.markdown(
         """
         <div class="glass-card">
