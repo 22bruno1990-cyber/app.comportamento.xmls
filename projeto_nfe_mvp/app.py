@@ -931,17 +931,6 @@ with st.sidebar:
         - última ingestão: **{historico["ultima_analise"]}**
         """
     )
-    st.markdown("---")
-    st.markdown("## Como vender em reunião")
-    st.markdown(
-        """
-        - mostre o resumo executivo;
-        - abra os 10 casos priorizados;
-        - destaque o valor em alerta;
-        - exporte o CSV para provar operacionalização;
-        - registre o lote no histórico para mostrar memória antifraude.
-        """
-    )
 
 uploaded_files = st.file_uploader(
     "Suba XMLs reais ou de teste",
