@@ -1119,6 +1119,96 @@ def resumo_categoria(df, categoria):
     }
 
 
+def build_column_config():
+    return {
+        "score_tecnico": st.column_config.NumberColumn(
+            "score_tecnico",
+            help="Pontuação dos indícios técnicos, como XML repetido, ID da NF já visto ou chave de negócio duplicada.",
+            format="%d",
+        ),
+        "nivel_risco_tecnico": st.column_config.TextColumn(
+            "nivel_risco_tecnico",
+            help="Faixa de risco da análise técnica.",
+        ),
+        "score_comportamental": st.column_config.NumberColumn(
+            "score_comportamental",
+            help="Pontuação dos padrões suspeitos de comportamento, como abuso de serviço ou crescimento exponencial.",
+            format="%d",
+        ),
+        "risco_comportamental": st.column_config.TextColumn(
+            "risco_comportamental",
+            help="Faixa de risco comportamental calculada pelo sistema.",
+        ),
+        "score_final": st.column_config.NumberColumn(
+            "score_final",
+            help="Maior score entre a análise técnica e a análise comportamental.",
+            format="%d",
+        ),
+        "classificacao_final": st.column_config.TextColumn(
+            "classificacao_final",
+            help="Resultado final priorizado do caso: duplicidade, reapresentação, abuso de serviço, crescimento exponencial ou normal.",
+        ),
+        "motivo_tecnico": st.column_config.TextColumn(
+            "motivo_tecnico",
+            help="Explica quais regras técnicas fizeram o caso ser sinalizado.",
+        ),
+        "motivo_comportamental": st.column_config.TextColumn(
+            "motivo_comportamental",
+            help="Explica quais padrões de comportamento elevaram o risco do caso.",
+        ),
+        "motivo_historico": st.column_config.TextColumn(
+            "motivo_historico",
+            help="Mostra se já houve ocorrência semelhante no histórico salvo.",
+        ),
+        "flag_abuso_servico": st.column_config.CheckboxColumn(
+            "flag_abuso_servico",
+            help="Marca quando o valor do procedimento ficou muito acima da mediana do grupo no lote.",
+        ),
+        "abuso_servico_pct": st.column_config.NumberColumn(
+            "abuso_servico_pct",
+            help="Percentual acima da mediana do procedimento usado para sinalizar abuso de serviço.",
+            format="%.1f%%",
+        ),
+        "flag_crescimento_exponencial": st.column_config.CheckboxColumn(
+            "flag_crescimento_exponencial",
+            help="Marca crescimento desproporcional do ticket médio com volume semelhante.",
+        ),
+        "flag_crescimento_lote_atual": st.column_config.CheckboxColumn(
+            "flag_crescimento_lote_atual",
+            help="Indica que o salto de valor foi detectado comparando lotes dentro da própria amostra enviada.",
+        ),
+        "crescimento_pct": st.column_config.NumberColumn(
+            "crescimento_pct",
+            help="Percentual de crescimento do valor médio por prestador e procedimento.",
+            format="%.1f%%",
+        ),
+        "categoria_trilha": st.column_config.TextColumn(
+            "categoria_trilha",
+            help="Agrupamento executivo do caso na trilha de risco.",
+        ),
+        "hist_hash_count": st.column_config.NumberColumn(
+            "hist_hash_count",
+            help="Quantidade de vezes que o mesmo hash de XML já apareceu no histórico.",
+            format="%d",
+        ),
+        "hist_id_count": st.column_config.NumberColumn(
+            "hist_id_count",
+            help="Quantidade de ocorrências do mesmo ID de NF no histórico.",
+            format="%d",
+        ),
+        "hist_business_count": st.column_config.NumberColumn(
+            "hist_business_count",
+            help="Quantidade de vezes que a mesma chave de negócio apareceu no histórico.",
+            format="%d",
+        ),
+        "hist_behavior_count": st.column_config.NumberColumn(
+            "hist_behavior_count",
+            help="Quantidade de padrões semelhantes já vistos no histórico para paciente, prestador, procedimento e data.",
+            format="%d",
+        ),
+    }
+
+
 def render_metric(coluna, classe, label, value, sub):
     coluna.markdown(
         f"""
@@ -1219,6 +1309,7 @@ def render_results(df, origem):
     resumo = resumo_executivo(df)
     df = df.copy()
     df["categoria_trilha"] = df["classificacao_final"].apply(categoria_trilha_risco)
+    column_config = build_column_config()
 
     st.markdown(f"### Painel executivo")
     st.caption(f"Fonte analisada: {origem}")
@@ -1333,6 +1424,7 @@ def render_results(df, origem):
             st.caption(f"Lista completa da categoria: {quantidade_total} caso(s).")
             st.dataframe(
                 dados_categoria[colunas_trilha].sort_values(by=["score_final", "valor_nf"], ascending=[False, False]),
+                column_config=column_config,
                 use_container_width=True,
             )
 
@@ -1356,7 +1448,7 @@ def render_results(df, origem):
         "motivo_tecnico",
         "motivo_comportamental",
     ]
-    st.dataframe(df[colunas_top].head(10), use_container_width=True)
+    st.dataframe(df[colunas_top].head(10), column_config=column_config, use_container_width=True)
 
     st.markdown("### Base completa para auditoria")
     colunas_exibicao = [
@@ -1405,6 +1497,7 @@ def render_results(df, origem):
     ]
     st.dataframe(
         df[colunas_exibicao].style.apply(highlight_risco, axis=1),
+        column_config=column_config,
         use_container_width=True,
     )
 
