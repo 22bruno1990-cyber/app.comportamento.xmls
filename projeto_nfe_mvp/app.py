@@ -163,6 +163,45 @@ st.markdown(
         color: #0d2340;
     }
 
+    .risk-strip {
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 22px;
+        padding: 18px 22px;
+        box-shadow: 0 10px 28px rgba(28, 48, 74, 0.08);
+        margin-bottom: 14px;
+        display: grid;
+        grid-template-columns: minmax(180px, 240px) minmax(180px, 220px) 1fr;
+        align-items: center;
+        gap: 18px;
+    }
+
+    .risk-strip-title {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0d2340;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .risk-strip-value {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #142b4d;
+        white-space: nowrap;
+    }
+
+    .risk-strip-copy {
+        font-size: 0.95rem;
+        color: #506176;
+        line-height: 1.45;
+    }
+
+    @media (max-width: 900px) {
+        .risk-strip {
+            grid-template-columns: 1fr;
+        }
+    }
+
     .mini-tag {
         display: inline-block;
         margin-right: 8px;
@@ -593,9 +632,33 @@ def highlight_risco(row):
 
 
 def carregar_demo(limit=24):
-    arquivos = sorted(DEMO_DIR.glob("*.xml"))[:limit]
+    todos = {caminho.name: caminho for caminho in DEMO_DIR.glob("*.xml")}
+    nomes_prioritarios = [
+        "NFe_REAP_1020.xml",
+        "NFe_REAP_1021.xml",
+        "NFe_REAP_1022.xml",
+        "NFe_REAP_1023.xml",
+        "NFe_DUP_MESMO_LOTE_1000.xml",
+        "NFe_DUP_MESMO_LOTE_1001.xml",
+        "NFe_DUP_MESMO_LOTE_1002.xml",
+        "NFe_DUP_MESMO_LOTE_1003.xml",
+        "NFe_COMP_5030.xml",
+        "NFe_COMP_5031.xml",
+        "NFe_COMP_5032.xml",
+        "NFe_COMP_5033.xml",
+        "NFe_1000.xml",
+        "NFe_1001.xml",
+        "NFe_1002.xml",
+        "NFe_1003.xml",
+    ]
+    arquivos = [todos[nome] for nome in nomes_prioritarios if nome in todos]
+    if len(arquivos) < limit:
+        ja_usados = {arquivo.name for arquivo in arquivos}
+        complementares = [caminho for caminho in sorted(todos.values()) if caminho.name not in ja_usados]
+        arquivos.extend(complementares[: max(0, limit - len(arquivos))])
+
     demo_files = []
-    for caminho in arquivos:
+    for caminho in arquivos[:limit]:
         demo_files.append(
             {
                 "name": caminho.name,
@@ -902,10 +965,10 @@ def render_results(df, origem):
         valor_categoria = float(df.loc[df["categoria_trilha"] == categoria, "valor_nf_num"].sum())
         st.markdown(
             f"""
-            <div class="insight-box" style="border-left-color:{'#b02a2a' if classe == 'red' else '#d0a11f' if classe == 'gold' else '#d97822'};">
-                <strong>{categoria}</strong> · {len(dados_categoria)} caso(s) em destaque ·
-                <strong>{formatar_brl(valor_categoria)}</strong> em valor associado.
-                <br>{descricao}.
+            <div class="risk-strip" style="border-left:6px solid {'#b02a2a' if classe == 'red' else '#d0a11f' if classe == 'gold' else '#d97822'};">
+                <div class="risk-strip-title">{categoria}</div>
+                <div class="risk-strip-value">{len(dados_categoria)} caso(s) · {formatar_brl(valor_categoria)}</div>
+                <div class="risk-strip-copy">{descricao}.</div>
             </div>
             """,
             unsafe_allow_html=True,
