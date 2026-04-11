@@ -990,20 +990,47 @@ def carregar_demo(limit=24):
         )
 
     # Injeta dois lotes sintéticos para demonstrar crescimento exponencial e abuso de serviço
-    def ajustar_xml(conteudo, novo_valor=None, novo_lote=None):
+    def ajustar_xml(
+        conteudo,
+        novo_valor=None,
+        novo_lote=None,
+        overrides_inf_cpl=None,
+        novo_emitente=None,
+    ):
         root = ET.fromstring(conteudo)
         valor_el = root.find(".//nfe:total/nfe:ICMSTot/nfe:vNF", NAMESPACE)
         inf_cpl_el = root.find(".//nfe:infAdic/nfe:infCpl", NAMESPACE)
+        emitente_el = root.find(".//nfe:emit/nfe:xNome", NAMESPACE)
         if novo_valor is not None and valor_el is not None:
             valor_el.text = f"{novo_valor:.2f}"
-        if novo_lote is not None and inf_cpl_el is not None and inf_cpl_el.text:
+        if novo_emitente is not None and emitente_el is not None:
+            emitente_el.text = novo_emitente
+        if inf_cpl_el is not None and inf_cpl_el.text:
             partes = [parte.strip() for parte in inf_cpl_el.text.replace("\n", " ").split("|")]
-            novas_partes = []
+            mapa = {}
             for parte in partes:
-                if parte.startswith("lote="):
-                    novas_partes.append(f"lote={novo_lote}")
-                elif parte:
-                    novas_partes.append(parte)
+                if "=" in parte:
+                    chave, valor = parte.split("=", 1)
+                    mapa[chave.strip()] = valor.strip()
+            if novo_lote is not None:
+                mapa["lote"] = novo_lote
+            if overrides_inf_cpl:
+                mapa.update(overrides_inf_cpl)
+            novas_partes = []
+            ordem = [
+                "usuario_envio",
+                "paciente",
+                "cpf_paciente",
+                "prestador",
+                "procedimento",
+                "data_atendimento",
+                "evento_clinico",
+                "guia_atendimento",
+                "lote",
+            ]
+            for chave in ordem:
+                if chave in mapa:
+                    novas_partes.append(f"{chave}={mapa[chave]}")
             inf_cpl_el.text = " |\n".join(novas_partes)
         return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -1027,6 +1054,87 @@ def carregar_demo(limit=24):
                 {
                     "name": "DEMO_CRESC_ALTO_02.xml",
                     "content": ajustar_xml(base_crescimento_2.read_bytes(), novo_valor=3590.0, novo_lote="lote_demo_explosao"),
+                },
+            ]
+        )
+
+    base_estetica_1 = todos.get("NFe_1001.xml")
+    base_estetica_2 = todos.get("NFe_1004.xml")
+    base_estetica_3 = todos.get("NFe_1008.xml")
+    if base_estetica_1 and base_estetica_2 and base_estetica_3:
+        demo_files.extend(
+            [
+                {
+                    "name": "DEMO_ESTETICA_FAMILIA_01.xml",
+                    "content": ajustar_xml(
+                        base_estetica_1.read_bytes(),
+                        novo_valor=1480.0,
+                        novo_lote="lote_estetica_familia",
+                        novo_emitente="Clinica Derma Beauty Integrada",
+                        overrides_inf_cpl={
+                            "paciente": "Mariana Souza",
+                            "cpf_paciente": "11122233344",
+                            "prestador": "Derma Beauty Estetica Integrada",
+                            "procedimento": "Consulta dermatologica",
+                            "data_atendimento": "2026-02-03",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAEST001",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_ESTETICA_FAMILIA_02.xml",
+                    "content": ajustar_xml(
+                        base_estetica_2.read_bytes(),
+                        novo_valor=1520.0,
+                        novo_lote="lote_estetica_familia",
+                        novo_emitente="Clinica Derma Beauty Integrada",
+                        overrides_inf_cpl={
+                            "paciente": "Carlos Souza",
+                            "cpf_paciente": "22233344455",
+                            "prestador": "Derma Beauty Estetica Integrada",
+                            "procedimento": "Consulta dermatologica",
+                            "data_atendimento": "2026-02-03",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAEST002",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_ESTETICA_FAMILIA_03.xml",
+                    "content": ajustar_xml(
+                        base_estetica_3.read_bytes(),
+                        novo_valor=1380.0,
+                        novo_lote="lote_estetica_familia",
+                        novo_emitente="Centro Nutri Wellness Estetica",
+                        overrides_inf_cpl={
+                            "paciente": "Fernanda Lima",
+                            "cpf_paciente": "33344455566",
+                            "prestador": "Nutri Wellness Estetica Avancada",
+                            "procedimento": "Consulta nutricional",
+                            "data_atendimento": "2026-02-05",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAEST003",
+                        },
+                    ),
+                },
+                {
+                    "name": "DEMO_ESTETICA_FAMILIA_04.xml",
+                    "content": ajustar_xml(
+                        base_estetica_1.read_bytes(),
+                        novo_valor=1415.0,
+                        novo_lote="lote_estetica_familia",
+                        novo_emitente="Centro Nutri Wellness Estetica",
+                        overrides_inf_cpl={
+                            "paciente": "Ricardo Lima",
+                            "cpf_paciente": "44455566677",
+                            "prestador": "Nutri Wellness Estetica Avancada",
+                            "procedimento": "Consulta nutricional",
+                            "data_atendimento": "2026-02-05",
+                            "evento_clinico": "Consulta ambulatorial",
+                            "guia_atendimento": "GUIAEST004",
+                        },
+                    ),
                 },
             ]
         )
