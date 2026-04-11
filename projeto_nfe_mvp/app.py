@@ -184,6 +184,7 @@ st.markdown(
         padding: 20px 22px;
         box-shadow: 0 10px 28px rgba(28, 48, 74, 0.08);
         height: 100%;
+        min-height: 260px;
         margin-top: 10px;
     }
 
