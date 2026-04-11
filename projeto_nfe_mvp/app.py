@@ -345,6 +345,95 @@ CONSULTA_CAMUFLADA_KEYWORDS = [
     "avaliacao",
 ]
 
+SEGMENT_COPY = {
+    "Saúde": {
+        "hero_title": "Revele duplicidades e sinais de reapresentação antes do reembolso sair.",
+        "hero_text": (
+            "Esta demo transforma XMLs de NF-e em uma fila priorizada de risco. Em minutos, "
+            "o time identifica reapresentações, duplicidades técnicas e padrões comportamentais "
+            "suspeitos para auditoria, glosa e prevenção de perdas."
+        ),
+        "pill_4": "Demo pronta para comprador",
+        "problem": (
+            "Reembolsos podem ser aprovados com documentos reapresentados ou com padrões "
+            "repetitivos que passam despercebidos em análise manual."
+        ),
+        "solution": (
+            "O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico, "
+            "detecta abuso de serviço, crescimento exponencial, quebra de NF e possível estético camuflado, "
+            "e prioriza os casos com maior chance de perda financeira."
+        ),
+        "value": (
+            "Menos revisão cega, mais foco no que merece auditoria. O resultado sai em "
+            "formato operacional, pronto para investigação, memória histórica ou integração."
+        ),
+        "empty_info": "Você pode subir XMLs reais ou usar a demo guiada para mostrar valor imediatamente.",
+        "panel_title": "Painel executivo",
+        "source_prefix": "Fonte analisada",
+        "summary_title": "Resumo para decisor",
+        "summary_copy": (
+            "<strong>{potencial}</strong> de <strong>{total}</strong> documentos foram "
+            "priorizados para revisão, com <strong>{valor}</strong> em valor associado a alertas "
+            "de score 60+. O histórico já reconheceu <strong>{vistos}</strong> documento(s) com vínculo anterior."
+        ),
+        "distribution_title": "Distribuição de alertas",
+        "risk_caption": "Separação executiva dos casos para demonstrar fraude forte, suspeita e duplicidade com valor potencial evitado.",
+        "legend": (
+            "Legenda rápida: abuso de serviço = valor acima da mediana do procedimento; "
+            "quebra de NF = fracionamento do valor em 2x, 3x ou 4x dentro do mesmo contexto; "
+            "crescimento exponencial = salto do ticket médio com volume semelhante; "
+            "estético camuflado = indício estético no prestador + grupo familiar concentrado no mesmo lote."
+        ),
+        "upload_label": "Suba XMLs reais ou de teste",
+        "upload_help": "Você pode usar seus XMLs ou acionar a demo guiada no menu lateral.",
+        "demo_origin": "Demo guiada com XMLs de exemplo",
+        "manual_origin": "Upload manual de {qtd} arquivo(s)",
+    },
+    "Contas a pagar": {
+        "hero_title": "Revele duplicidades, fracionamentos e reapresentações antes do pagamento sair.",
+        "hero_text": (
+            "Esta demo transforma XMLs de NF-e em uma fila priorizada de risco. Em minutos, "
+            "o financeiro identifica notas reapresentadas, duplicidades técnicas, fracionamentos "
+            "de cobrança e padrões suspeitos para auditoria e prevenção de pagamentos indevidos."
+        ),
+        "pill_4": "Demo pronta para financeiro",
+        "problem": (
+            "Pagamentos podem ser liberados com notas reapresentadas, cobranças fracionadas "
+            "ou padrões repetitivos que passam despercebidos na conferência manual."
+        ),
+        "solution": (
+            "O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico, "
+            "detecta cobrança acima da referência, crescimento anômalo, quebra de NF e "
+            "reapresentações antes da saída do pagamento."
+        ),
+        "value": (
+            "Menos conferência cega, mais foco no que realmente merece revisão. O resultado sai "
+            "em formato operacional, pronto para investigação, memória histórica ou integração com contas a pagar."
+        ),
+        "empty_info": "Você pode subir XMLs reais de fornecedores ou usar a demo guiada para mostrar valor imediatamente.",
+        "panel_title": "Painel executivo",
+        "source_prefix": "Base analisada",
+        "summary_title": "Resumo para decisor",
+        "summary_copy": (
+            "<strong>{potencial}</strong> de <strong>{total}</strong> documentos foram "
+            "priorizados para revisão, com <strong>{valor}</strong> em valor associado a alertas "
+            "de score 60+. O histórico já reconheceu <strong>{vistos}</strong> documento(s) com possível vínculo anterior."
+        ),
+        "distribution_title": "Distribuição de alertas",
+        "risk_caption": "Separação executiva dos casos para demonstrar pagamento indevido, suspeita operacional e duplicidade com valor potencial evitado.",
+        "legend": (
+            "Legenda rápida: abuso de serviço = cobrança acima da mediana da referência; "
+            "quebra de NF = fracionamento do valor em 2x, 3x ou 4x dentro do mesmo contexto; "
+            "crescimento exponencial = salto do ticket médio com volume semelhante; "
+            "estético camuflado = heurística aplicável quando houver padrão de serviço possivelmente camuflado."
+        ),
+        "upload_label": "Suba XMLs de fornecedores ou de teste",
+        "upload_help": "Você pode usar XMLs reais de contas a pagar ou acionar a demo guiada no menu lateral.",
+        "demo_origin": "Demo guiada com XMLs de exemplo",
+        "manual_origin": "Upload manual de {qtd} arquivo(s)",
+    },
+}
+
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
@@ -1677,22 +1766,20 @@ def render_metric(coluna, classe, label, value, sub):
     )
 
 
-def render_hero():
+def render_hero(copy):
     st.markdown(
-        """
+        f"""
         <div class="hero">
             <div class="hero-kicker">PSL | Revenue Protection</div>
-            <h1>Revele duplicidades e sinais de reapresentação antes do reembolso sair.</h1>
+            <h1>{copy["hero_title"]}</h1>
             <p>
-                Esta demo transforma XMLs de NF-e em uma fila priorizada de risco. Em minutos,
-                o time identifica reapresentações, duplicidades técnicas e padrões comportamentais
-                suspeitos para auditoria, glosa e prevenção de perdas.
+                {copy["hero_text"]}
             </p>
             <div class="pill-row">
                 <div class="pill">Upload em lote</div>
                 <div class="pill">Priorização automática</div>
                 <div class="pill">CSV para auditoria</div>
-                <div class="pill">Demo pronta para comprador</div>
+                <div class="pill">{copy["pill_4"]}</div>
             </div>
         </div>
         """,
@@ -1700,16 +1787,15 @@ def render_hero():
     )
 
 
-def render_pitch():
+def render_pitch(copy):
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(
-            """
+            f"""
             <div class="glass-card">
                 <div class="section-title">Problema</div>
                 <div class="section-copy">
-                    Reembolsos podem ser aprovados com documentos reapresentados ou com padrões
-                    repetitivos que passam despercebidos em análise manual.
+                    {copy["problem"]}
                 </div>
             </div>
             """,
@@ -1717,13 +1803,11 @@ def render_pitch():
         )
     with c2:
         st.markdown(
-            """
+            f"""
             <div class="glass-card">
                 <div class="section-title">Solução</div>
                 <div class="section-copy">
-                    O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico,
-                    detecta abuso de serviço, crescimento exponencial, quebra de NF e possível estético camuflado,
-                    e prioriza os casos com maior chance de perda financeira.
+                    {copy["solution"]}
                 </div>
             </div>
             """,
@@ -1731,12 +1815,11 @@ def render_pitch():
         )
     with c3:
         st.markdown(
-            """
+            f"""
             <div class="glass-card">
                 <div class="section-title">Valor para comprador</div>
                 <div class="section-copy">
-                    Menos revisão cega, mais foco no que merece auditoria. O resultado sai em
-                    formato operacional, pronto para investigação, memória histórica ou integração.
+                    {copy["value"]}
                 </div>
             </div>
             """,
@@ -1744,7 +1827,7 @@ def render_pitch():
         )
 
 
-def render_empty_state():
+def render_empty_state(copy):
     st.markdown('<div class="soft-heading">Como demonstrar em 30 segundos</div>', unsafe_allow_html=True)
     st.markdown(
         """
@@ -1757,17 +1840,17 @@ def render_empty_state():
         """,
         unsafe_allow_html=True,
     )
-    st.info("Você pode subir XMLs reais ou usar a demo guiada para mostrar valor imediatamente.")
+    st.info(copy["empty_info"])
 
 
-def render_results(df, origem):
+def render_results(df, origem, copy):
     resumo = resumo_executivo(df)
     df = df.copy()
     df["categoria_trilha"] = df["classificacao_final"].apply(categoria_trilha_risco)
     column_config = build_column_config()
 
-    st.markdown(f"### Painel executivo")
-    st.caption(f"Fonte analisada: {origem}")
+    st.markdown(f'### {copy["panel_title"]}')
+    st.caption(f'{copy["source_prefix"]}: {origem}')
 
     c1, c2, c3 = st.columns(3)
     render_metric(c1, "blue", "XMLs analisados", resumo["total"], "volume processado")
@@ -1786,12 +1869,14 @@ def render_results(df, origem):
         st.markdown(
             f"""
             <div class="panel-card panel-block">
-                <div class="summary-title">Resumo para decisor</div>
+                <div class="summary-title">{copy["summary_title"]}</div>
                 <div class="summary-copy">
-                    <strong>{resumo["potencial_revisao"]}</strong> de <strong>{resumo["total"]}</strong> documentos foram
-                    priorizados para revisão, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong> em valor
-                    associado a alertas de score 60+. O histórico já reconheceu
-                    <strong>{resumo["vistos_historico"]}</strong> documento(s) com vínculo anterior.
+                    {copy["summary_copy"].format(
+                        potencial=resumo["potencial_revisao"],
+                        total=resumo["total"],
+                        valor=formatar_brl(resumo["valor_em_alerta"]),
+                        vistos=resumo["vistos_historico"],
+                    )}
                 </div>
             </div>
             """,
@@ -1820,7 +1905,7 @@ def render_results(df, origem):
             )
         st.markdown(
             f'<div class="panel-card panel-block">'
-            f'<div class="chart-title">Distribuição de alertas</div>'
+            f'<div class="chart-title">{copy["distribution_title"]}</div>'
             f'<div class="chart-wrap">{"".join(rows)}</div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -1837,12 +1922,7 @@ def render_results(df, origem):
     render_metric(r3, "orange", "Valor em duplicidade", formatar_brl(duplicado["valor"]), f'{duplicado["quantidade"]} caso(s) duplicados')
 
     st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
-    st.info(
-        "Legenda rápida: abuso de serviço = valor acima da mediana do procedimento; "
-        "quebra de NF = fracionamento do valor em 2x, 3x ou 4x dentro do mesmo contexto; "
-        "crescimento exponencial = salto do ticket médio com volume semelhante; "
-        "estético camuflado = indício estético no prestador + grupo familiar concentrado no mesmo lote."
-    )
+    st.info(copy["legend"])
     st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
     t1, t2, t3 = st.columns(3)
@@ -1857,7 +1937,7 @@ def render_results(df, origem):
         st.dataframe(df["paciente"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
 
     st.markdown("### Trilha de risco")
-    st.caption("Separação executiva dos casos para demonstrar fraude forte, suspeita e duplicidade com valor potencial evitado.")
+    st.caption(copy["risk_caption"])
 
     trilhas = [
         ("FRAUDE FORTE", "red", "Fraudes fortes com maior potencial de bloqueio imediato"),
@@ -1987,11 +2067,11 @@ def render_results(df, origem):
     )
 
 
-render_hero()
-render_pitch()
-
 with st.sidebar:
     historico = load_history_stats()
+    segmento = st.radio("Segmento da apresentação", list(SEGMENT_COPY.keys()), index=0)
+    copy = SEGMENT_COPY[segmento]
+    st.markdown("---")
     st.markdown("## Modo de demonstração")
     usar_demo = st.button("Carregar demo guiada", use_container_width=True)
     st.caption("A demo usa XMLs de exemplo já publicados no repositório.")
@@ -2006,11 +2086,14 @@ with st.sidebar:
         """
     )
 
+render_hero(copy)
+render_pitch(copy)
+
 uploaded_files = st.file_uploader(
-    "Suba XMLs reais ou de teste",
+    copy["upload_label"],
     type=["xml"],
     accept_multiple_files=True,
-    help="Você pode usar seus XMLs ou acionar a demo guiada no menu lateral.",
+    help=copy["upload_help"],
 )
 
 origem = None
@@ -2018,15 +2101,15 @@ df = pd.DataFrame()
 
 if usar_demo:
     df = processar_arquivos(carregar_demo())
-    origem = "Demo guiada com XMLs de exemplo"
+    origem = copy["demo_origin"]
 elif uploaded_files:
     df = processar_arquivos(uploaded_files)
-    origem = f"Upload manual de {len(uploaded_files)} arquivo(s)"
+    origem = copy["manual_origin"].format(qtd=len(uploaded_files))
 
 if not df.empty:
-    render_results(df, origem)
+    render_results(df, origem, copy)
     if st.button("Registrar este lote no histórico", use_container_width=True):
         salvos = salvar_lote_no_historico(df, origem)
         st.success(f"{salvos} documento(s) foram gravados no histórico antifraude.")
 else:
-    render_empty_state()
+    render_empty_state(copy)
