@@ -690,6 +690,11 @@ def resumo_executivo(df):
         "vistos_historico": int(df["ja_visto_historico"].sum()),
         "potencial_revisao": reapresentacao + duplicidade + comportamento,
         "valor_em_alerta": float(df.loc[df["score_final"] >= 60, "valor_nf_num"].sum()),
+        "valor_fraude_forte": float(df.loc[df["classificacao_final"] == "REAPRESENTACAO", "valor_nf_num"].sum()),
+        "valor_duplicidade": float(df.loc[df["classificacao_final"] == "DUPLICIDADE", "valor_nf_num"].sum()),
+        "valor_suspeito": float(
+            df.loc[df["classificacao_final"].isin(["COMPORTAMENTO SUSPEITO", "ALERTA COMPORTAMENTAL"]), "valor_nf_num"].sum()
+        ),
     }
 
 
@@ -697,6 +702,25 @@ def formatar_brl(valor):
     texto = f"{valor:,.2f}"
     texto = texto.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"R$ {texto}"
+
+
+def categoria_trilha_risco(classificacao):
+    if classificacao == "REAPRESENTACAO":
+        return "FRAUDE FORTE"
+    if classificacao == "DUPLICIDADE":
+        return "DUPLICIDADE"
+    if classificacao in {"COMPORTAMENTO SUSPEITO", "ALERTA COMPORTAMENTAL", "ALERTA"}:
+        return "SUSPEITO"
+    return "NORMAL"
+
+
+def resumo_categoria(df, categoria):
+    base = df[df["categoria_trilha"] == categoria]
+    return {
+        "quantidade": int(len(base)),
+        "valor": float(base["valor_nf_num"].sum()),
+        "top": base.head(5),
+    }
 
 
 def render_metric(coluna, classe, label, value, sub):
@@ -796,6 +820,8 @@ def render_empty_state():
 
 def render_results(df, origem):
     resumo = resumo_executivo(df)
+    df = df.copy()
+    df["categoria_trilha"] = df["classificacao_final"].apply(categoria_trilha_risco)
 
     st.markdown(f"### Painel executivo")
     st.caption(f"Fonte analisada: {origem}")
@@ -833,6 +859,14 @@ def render_results(df, origem):
         st.bar_chart(top_classificacoes)
         st.markdown("</div>", unsafe_allow_html=True)
 
+    r1, r2, r3 = st.columns(3)
+    fraude = resumo_categoria(df, "FRAUDE FORTE")
+    suspeito = resumo_categoria(df, "SUSPEITO")
+    duplicado = resumo_categoria(df, "DUPLICIDADE")
+    render_metric(r1, "red", "Valor evitável | fraude", formatar_brl(fraude["valor"]), f'{fraude["quantidade"]} caso(s) críticos')
+    render_metric(r2, "gold", "Valor em suspeita", formatar_brl(suspeito["valor"]), f'{suspeito["quantidade"]} caso(s) suspeitos')
+    render_metric(r3, "orange", "Valor em duplicidade", formatar_brl(duplicado["valor"]), f'{duplicado["quantidade"]} caso(s) duplicados')
+
     t1, t2, t3 = st.columns(3)
     with t1:
         st.markdown("#### Usuários mais recorrentes")
@@ -843,6 +877,41 @@ def render_results(df, origem):
     with t3:
         st.markdown("#### Pacientes mais recorrentes")
         st.dataframe(df["paciente"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
+
+    st.markdown("### Trilha de risco")
+    st.caption("Separação executiva dos casos para demonstrar fraude forte, suspeita e duplicidade com valor potencial evitado.")
+
+    trilhas = [
+        ("FRAUDE FORTE", "red", "Fraudes fortes com maior potencial de bloqueio imediato"),
+        ("SUSPEITO", "gold", "Casos suspeitos para revisão especializada"),
+        ("DUPLICIDADE", "orange", "Duplicidades técnicas e reapresentações relevantes"),
+    ]
+    colunas_trilha = [
+        "arquivo",
+        "paciente",
+        "prestador",
+        "valor_nf",
+        "score_final",
+        "classificacao_final",
+        "motivo_historico",
+        "motivo_tecnico",
+        "motivo_comportamental",
+    ]
+    for categoria, classe, descricao in trilhas:
+        dados_categoria = df[df["categoria_trilha"] == categoria].head(5)
+        valor_categoria = float(df.loc[df["categoria_trilha"] == categoria, "valor_nf_num"].sum())
+        st.markdown(
+            f"""
+            <div class="insight-box" style="border-left-color:{'#b02a2a' if classe == 'red' else '#d0a11f' if classe == 'gold' else '#d97822'};">
+                <strong>{categoria}</strong> · {len(dados_categoria)} caso(s) em destaque ·
+                <strong>{formatar_brl(valor_categoria)}</strong> em valor associado.
+                <br>{descricao}.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if not dados_categoria.empty:
+            st.dataframe(dados_categoria[colunas_trilha], use_container_width=True)
 
     st.markdown("### Casos priorizados")
     colunas_top = [
@@ -857,6 +926,7 @@ def render_results(df, origem):
         "score_comportamental",
         "score_final",
         "classificacao_final",
+        "categoria_trilha",
         "motivo_historico",
         "motivo_tecnico",
         "motivo_comportamental",
