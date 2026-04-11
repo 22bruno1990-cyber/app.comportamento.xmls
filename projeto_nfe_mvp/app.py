@@ -107,6 +107,10 @@ st.markdown(
         line-height: 1.55;
     }
 
+    h3, h4 {
+        color: #152b4c !important;
+    }
+
     .soft-heading {
         color: #d7e0ee;
         font-size: 1.05rem;
@@ -183,6 +187,14 @@ st.markdown(
         margin-top: 10px;
     }
 
+    .panel-block {
+        margin-top: 2.2rem;
+    }
+
+    .section-gap {
+        height: 1.6rem;
+    }
+
     .summary-title,
     .chart-title {
         color: #152b4c;
@@ -203,6 +215,13 @@ st.markdown(
 
     .chart-wrap {
         margin-top: 6px;
+    }
+
+    .chart-text {
+        color: #223a5b;
+        font-size: 0.88rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
     }
 
     .risk-strip {
@@ -941,11 +960,13 @@ def render_results(df, origem):
     render_metric(c5, "blue", "Já vistos", resumo["vistos_historico"], "matches no histórico")
     render_metric(c6, "green", "Normais", resumo["normais"], "sem alerta relevante")
 
+    st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+
     a1, a2 = st.columns(2)
     with a1:
         st.markdown(
             f"""
-            <div class="panel-card">
+            <div class="panel-card panel-block">
                 <div class="summary-title">Resumo para decisor</div>
                 <div class="summary-copy">
                     <strong>{resumo["potencial_revisao"]}</strong> de <strong>{resumo["total"]}</strong> documentos foram
@@ -962,7 +983,7 @@ def render_results(df, origem):
         max_valor = max(int(top_classificacoes.max()), 1) if not top_classificacoes.empty else 1
         st.markdown(
             """
-            <div class="panel-card">
+            <div class="panel-card panel-block">
                 <div class="chart-title">Distribuição de alertas</div>
                 <div class="chart-wrap"></div>
             </div>
@@ -971,9 +992,11 @@ def render_results(df, origem):
         )
         for categoria, quantidade in top_classificacoes.items():
             label_col, progress_col, value_col = st.columns([1.2, 4, 0.5])
-            label_col.markdown(f"**{categoria}**")
+            label_col.markdown(f'<div class="chart-text">{categoria}</div>', unsafe_allow_html=True)
             progress_col.progress(int((int(quantidade) / max_valor) * 100))
-            value_col.markdown(f"**{int(quantidade)}**")
+            value_col.markdown(f'<div class="chart-text" style="text-align:right;">{int(quantidade)}</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
     r1, r2, r3 = st.columns(3)
     fraude = resumo_categoria(df, "FRAUDE FORTE")
@@ -982,6 +1005,8 @@ def render_results(df, origem):
     render_metric(r1, "red", "Valor evitável | fraude", formatar_brl(fraude["valor"]), f'{fraude["quantidade"]} caso(s) críticos')
     render_metric(r2, "gold", "Valor em suspeita", formatar_brl(suspeito["valor"]), f'{suspeito["quantidade"]} caso(s) suspeitos')
     render_metric(r3, "orange", "Valor em duplicidade", formatar_brl(duplicado["valor"]), f'{duplicado["quantidade"]} caso(s) duplicados')
+
+    st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
     t1, t2, t3 = st.columns(3)
     with t1:
