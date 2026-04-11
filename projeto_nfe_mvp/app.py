@@ -1279,19 +1279,22 @@ def render_results(df, origem):
         "motivo_comportamental",
     ]
     for categoria, classe, descricao in trilhas:
-        dados_categoria = df[df["categoria_trilha"] == categoria].head(5)
-        valor_categoria = float(df.loc[df["categoria_trilha"] == categoria, "valor_nf_num"].sum())
+        resumo_cat = resumo_categoria(df, categoria)
+        dados_categoria = resumo_cat["top"]
+        valor_categoria = resumo_cat["valor"]
+        quantidade_total = resumo_cat["quantidade"]
         st.markdown(
             f"""
             <div class="risk-strip" style="border-left:6px solid {'#1a4778' if classe == 'red' else '#5d89bf' if classe == 'gold' else '#3e78b8'};">
                 <div class="risk-strip-title">{categoria}</div>
-                <div class="risk-strip-value">{len(dados_categoria)} caso(s) · {formatar_brl(valor_categoria)}</div>
+                <div class="risk-strip-value">{quantidade_total} caso(s) · {formatar_brl(valor_categoria)}</div>
                 <div class="risk-strip-copy">{descricao}.</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
         if not dados_categoria.empty:
+            st.caption("Amostra dos principais casos desta categoria.")
             st.dataframe(dados_categoria[colunas_trilha], use_container_width=True)
 
     st.markdown("### Casos priorizados")
