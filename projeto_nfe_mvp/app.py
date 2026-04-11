@@ -326,10 +326,37 @@ BASE_DIR = Path(__file__).resolve().parent
 DEMO_DIR = BASE_DIR / "xmls_ricos"
 DB_DIR = BASE_DIR / "data"
 DB_PATH = DB_DIR / "historico_nfe.db"
+ESTETICA_KEYWORDS = [
+    "estet",
+    "beauty",
+    "harmon",
+    "cosmet",
+    "spa",
+    "wellness",
+    "laser",
+    "skin",
+    "face",
+    "corpo",
+]
+CONSULTA_CAMUFLADA_KEYWORDS = [
+    "dermat",
+    "nutri",
+    "consulta",
+    "avaliacao",
+]
 
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
+
+
+def normalizar_texto(valor):
+    return (valor or "").strip().lower()
+
+
+def extrair_sobrenome(nome):
+    partes = [parte for parte in (nome or "").replace("-", " ").split() if parte]
+    return partes[-1].lower() if len(partes) >= 2 else ""
 
 
 def get_db_connection():
@@ -563,6 +590,22 @@ def enrich_advanced_patterns(df):
     if df.empty:
         return df
 
+    df["sobrenome_paciente"] = df["paciente"].apply(extrair_sobrenome)
+    df["prestador_texto_base"] = (
+        df["prestador"].fillna("").map(normalizar_texto)
+        + " "
+        + df["razao_social_emitente"].fillna("").map(normalizar_texto)
+    ).str.strip()
+    df["flag_prestador_estetico"] = df["prestador_texto_base"].apply(
+        lambda texto: any(keyword in texto for keyword in ESTETICA_KEYWORDS)
+    )
+    df["flag_consulta_camuflada"] = df["procedimento"].fillna("").map(normalizar_texto).apply(
+        lambda texto: any(keyword in texto for keyword in CONSULTA_CAMUFLADA_KEYWORDS)
+    )
+    df["grupo_familia_prestador_lote"] = df.groupby(
+        ["sobrenome_paciente", "prestador", "lote"]
+    )["arquivo"].transform("count")
+
     df["procedimento_ref_qtd"] = df.groupby("procedimento")["arquivo"].transform("count")
     df["procedimento_ref_mediana"] = df.groupby("procedimento")["valor_nf_num"].transform("median")
     df["procedimento_ref_media"] = df.groupby("procedimento")["valor_nf_num"].transform("mean")
@@ -579,6 +622,13 @@ def enrich_advanced_patterns(df):
         ((df.loc[mascara_abuso, "valor_nf_num"] / df.loc[mascara_abuso, "procedimento_ref_mediana"]) - 1) * 100
     ).round(1)
     df["flag_abuso_servico"] = mascara_abuso
+
+    df["flag_estetico_camuflado"] = (
+        (df["flag_prestador_estetico"])
+        & (df["flag_consulta_camuflada"])
+        & (df["sobrenome_paciente"] != "")
+        & (df["grupo_familia_prestador_lote"] >= 2)
+    )
 
     df["grupo_prestador_proc_lote_qtd"] = df.groupby(["prestador", "procedimento", "lote"])["arquivo"].transform("count")
     df["grupo_prestador_proc_lote_valor_medio"] = df.groupby(["prestador", "procedimento", "lote"])["valor_nf_num"].transform("mean")
@@ -805,6 +855,12 @@ def calcular_score_comportamental(row):
     score = 0
     motivos = []
 
+    if row["flag_estetico_camuflado"]:
+        score += 65
+        motivos.append(
+            "Possível tratamento estético camuflado: prestador com indício estético e grupo familiar no mesmo lote"
+        )
+
     if row["flag_crescimento_exponencial"]:
         score += 55
         origem_crescimento = "no lote atual" if row.get("flag_crescimento_lote_atual") else "vs. histórico"
@@ -862,6 +918,8 @@ def classificar_final(row):
         return "REAPRESENTACAO"
     if row["nivel_risco_tecnico"] == "DUPLICIDADE":
         return "DUPLICIDADE"
+    if row["flag_estetico_camuflado"]:
+        return "ESTETICO CAMUFLADO"
     if row["flag_crescimento_exponencial"] and row["flag_abuso_servico"]:
         return "ABUSO + CRESCIMENTO"
     if row["flag_crescimento_exponencial"]:
@@ -881,6 +939,8 @@ def highlight_risco(row):
     classificacao = row["classificacao_final"]
     if classificacao == "REAPRESENTACAO":
         return ["background-color:#4e1212;color:#fff7f7"] * len(row)
+    if classificacao == "ESTETICO CAMUFLADO":
+        return ["background-color:#53376a;color:#fff7ff"] * len(row)
     if classificacao in {"ABUSO + CRESCIMENTO", "CRESCIMENTO EXPONENCIAL"}:
         return ["background-color:#5f3b18;color:#fff8f1"] * len(row)
     if classificacao == "ABUSO DE SERVICO":
@@ -1051,6 +1111,7 @@ def resumo_executivo(df):
             [
                 "COMPORTAMENTO SUSPEITO",
                 "ALERTA COMPORTAMENTAL",
+                "ESTETICO CAMUFLADO",
                 "ABUSO DE SERVICO",
                 "CRESCIMENTO EXPONENCIAL",
                 "ABUSO + CRESCIMENTO",
@@ -1076,6 +1137,7 @@ def resumo_executivo(df):
                     [
                         "COMPORTAMENTO SUSPEITO",
                         "ALERTA COMPORTAMENTAL",
+                        "ESTETICO CAMUFLADO",
                         "ABUSO DE SERVICO",
                         "CRESCIMENTO EXPONENCIAL",
                         "ABUSO + CRESCIMENTO",
@@ -1102,6 +1164,7 @@ def categoria_trilha_risco(classificacao):
         "COMPORTAMENTO SUSPEITO",
         "ALERTA COMPORTAMENTAL",
         "ALERTA",
+        "ESTETICO CAMUFLADO",
         "ABUSO DE SERVICO",
         "CRESCIMENTO EXPONENCIAL",
         "ABUSO + CRESCIMENTO",
@@ -1132,7 +1195,7 @@ def build_column_config():
         ),
         "score_comportamental": st.column_config.NumberColumn(
             "score_comportamental",
-            help="Pontuação dos padrões suspeitos de comportamento, como abuso de serviço ou crescimento exponencial.",
+            help="Pontuação dos padrões suspeitos de comportamento, como abuso de serviço, crescimento exponencial ou possível estético camuflado.",
             format="%d",
         ),
         "risco_comportamental": st.column_config.TextColumn(
@@ -1146,7 +1209,7 @@ def build_column_config():
         ),
         "classificacao_final": st.column_config.TextColumn(
             "classificacao_final",
-            help="Resultado final priorizado do caso: duplicidade, reapresentação, abuso de serviço, crescimento exponencial ou normal.",
+            help="Resultado final priorizado do caso: duplicidade, reapresentação, abuso de serviço, crescimento exponencial, estético camuflado ou normal.",
         ),
         "motivo_tecnico": st.column_config.TextColumn(
             "motivo_tecnico",
@@ -1172,6 +1235,10 @@ def build_column_config():
         "flag_crescimento_exponencial": st.column_config.CheckboxColumn(
             "flag_crescimento_exponencial",
             help="Marca crescimento desproporcional do ticket médio com volume semelhante.",
+        ),
+        "flag_estetico_camuflado": st.column_config.CheckboxColumn(
+            "flag_estetico_camuflado",
+            help="Marca possível tratamento estético camuflado com indício estético no prestador e grupo familiar concentrado no mesmo lote.",
         ),
         "flag_crescimento_lote_atual": st.column_config.CheckboxColumn(
             "flag_crescimento_lote_atual",
@@ -1267,8 +1334,8 @@ def render_pitch():
                 <div class="section-title">Solução</div>
                 <div class="section-copy">
                     O PSL lê XMLs, cruza sinais técnicos e comportamentais, consulta o histórico,
-                    detecta abuso de serviço e crescimento exponencial, e prioriza os casos com maior
-                    chance de perda financeira.
+                    detecta abuso de serviço, crescimento exponencial e possível estético camuflado,
+                    e prioriza os casos com maior chance de perda financeira.
                 </div>
             </div>
             """,
@@ -1374,6 +1441,12 @@ def render_results(df, origem):
     render_metric(r3, "orange", "Valor em duplicidade", formatar_brl(duplicado["valor"]), f'{duplicado["quantidade"]} caso(s) duplicados')
 
     st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+    st.info(
+        "Legenda rápida: abuso de serviço = valor acima da mediana do procedimento; "
+        "crescimento exponencial = salto do ticket médio com volume semelhante; "
+        "estético camuflado = indício estético no prestador + grupo familiar concentrado no mesmo lote."
+    )
+    st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
     t1, t2, t3 = st.columns(3)
     with t1:
@@ -1443,6 +1516,7 @@ def render_results(df, origem):
         "classificacao_final",
         "flag_abuso_servico",
         "flag_crescimento_exponencial",
+        "flag_estetico_camuflado",
         "categoria_trilha",
         "motivo_historico",
         "motivo_tecnico",
@@ -1478,6 +1552,7 @@ def render_results(df, origem):
         "procedimento_ref_mediana",
         "procedimento_ref_media",
         "flag_crescimento_exponencial",
+        "flag_estetico_camuflado",
         "flag_crescimento_lote_atual",
         "crescimento_pct",
         "hist_media_qtd_lote",
