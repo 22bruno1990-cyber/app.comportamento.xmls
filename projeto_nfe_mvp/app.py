@@ -250,12 +250,12 @@ def calcular_score_tecnico(row):
         motivos.append("Mesma NF reapresentada")
     elif row["dup_chave_negocio"]:
         score = 60
-        motivos.append("Chave de negocio duplicada")
+        motivos.append("Chave de negócio duplicada")
     elif row["dup_id_nfe"]:
         score = 40
         motivos.append("ID da NF repetido")
     else:
-        motivos.append("Sem indicios tecnicos")
+        motivos.append("Sem indícios técnicos")
 
     if score >= 90:
         nivel = "REAPRESENTACAO"
@@ -283,7 +283,7 @@ def calcular_score_comportamental(row):
 
     if row["grupo_usuario_evento"] >= 3 and row["usuario_envio"]:
         score += 20
-        motivos.append("Usuario repetindo padrao semelhante")
+        motivos.append("Usuário repetindo padrão semelhante")
 
     if row["grupo_cpf_data"] >= 3 and row["cpf_paciente"]:
         score += 15
@@ -303,7 +303,7 @@ def calcular_score_comportamental(row):
         nivel = "SEM ALERTA"
 
     if not motivos:
-        motivos.append("Sem padrao comportamental suspeito")
+        motivos.append("Sem padrão comportamental suspeito")
 
     return pd.Series([score, nivel, " | ".join(motivos)])
 
@@ -457,15 +457,15 @@ def render_hero():
         """
         <div class="hero">
             <div class="hero-kicker">PSL | Revenue Protection</div>
-            <h1>Revele duplicidades e sinais de reapresentacao antes do reembolso sair.</h1>
+            <h1>Revele duplicidades e sinais de reapresentação antes do reembolso sair.</h1>
             <p>
                 Esta demo transforma XMLs de NF-e em uma fila priorizada de risco. Em minutos,
-                o time identifica reapresentacoes, duplicidades tecnicas e padroes comportamentais
-                suspeitos para auditoria, glosa e prevencao de perdas.
+                o time identifica reapresentações, duplicidades técnicas e padrões comportamentais
+                suspeitos para auditoria, glosa e prevenção de perdas.
             </p>
             <div class="pill-row">
                 <div class="pill">Upload em lote</div>
-                <div class="pill">Priorizacao automatica</div>
+                <div class="pill">Priorização automática</div>
                 <div class="pill">CSV para auditoria</div>
                 <div class="pill">Demo pronta para comprador</div>
             </div>
@@ -483,8 +483,8 @@ def render_pitch():
             <div class="glass-card">
                 <div class="section-title">Problema</div>
                 <div class="section-copy">
-                    Reembolsos podem ser aprovados com documentos reapresentados ou com padroes
-                    repetitivos que passam despercebidos em analise manual.
+                    Reembolsos podem ser aprovados com documentos reapresentados ou com padrões
+                    repetitivos que passam despercebidos em análise manual.
                 </div>
             </div>
             """,
@@ -494,9 +494,9 @@ def render_pitch():
         st.markdown(
             """
             <div class="glass-card">
-                <div class="section-title">Solucao</div>
+                <div class="section-title">Solução</div>
                 <div class="section-copy">
-                    O PSL le XMLs, cruza sinais tecnicos e comportamentais e prioriza os casos
+                    O PSL lê XMLs, cruza sinais técnicos e comportamentais e prioriza os casos
                     com maior chance de perda financeira.
                 </div>
             </div>
@@ -509,8 +509,8 @@ def render_pitch():
             <div class="glass-card">
                 <div class="section-title">Valor para comprador</div>
                 <div class="section-copy">
-                    Menos revisao cega, mais foco no que merece auditoria. O resultado sai em
-                    formato operacional, pronto para investigacao ou integracao.
+                    Menos revisão cega, mais foco no que merece auditoria. O resultado sai em
+                    formato operacional, pronto para investigação ou integração.
                 </div>
             </div>
             """,
@@ -531,7 +531,7 @@ def render_empty_state():
         """,
         unsafe_allow_html=True,
     )
-    st.info("Voce pode subir XMLs reais ou usar a demo guiada para mostrar valor imediatamente.")
+    st.info("Você pode subir XMLs reais ou usar a demo guiada para mostrar valor imediatamente.")
 
 
 def render_results(df, origem):
@@ -542,9 +542,9 @@ def render_results(df, origem):
 
     c1, c2, c3, c4, c5 = st.columns(5)
     render_metric(c1, "blue", "XMLs analisados", resumo["total"], "volume processado na rodada")
-    render_metric(c2, "red", "Reapresentacao", resumo["reapresentacao"], "forte indicio tecnico")
-    render_metric(c3, "orange", "Duplicidade", resumo["duplicidade"], "casos tecnicos relevantes")
-    render_metric(c4, "gold", "Comportamental", resumo["comportamento"], "padroes suspeitos")
+    render_metric(c2, "red", "Reapresentação", resumo["reapresentacao"], "forte indício técnico")
+    render_metric(c3, "orange", "Duplicidade", resumo["duplicidade"], "casos técnicos relevantes")
+    render_metric(c4, "gold", "Comportamental", resumo["comportamento"], "padrões suspeitos")
     render_metric(c5, "green", "Normais", resumo["normais"], "sem alerta relevante")
 
     a1, a2 = st.columns([1.2, 1])
@@ -553,7 +553,7 @@ def render_results(df, origem):
             f"""
             <div class="insight-box">
                 <strong>Resumo para decisor:</strong> {resumo["potencial_revisao"]} de {resumo["total"]} documentos
-                foram priorizados para revisao, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong>
+                foram priorizados para revisão, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong>
                 em valor associado a alertas de score 60+.
             </div>
             """,
@@ -573,14 +573,14 @@ def render_results(df, origem):
 
     t1, t2, t3 = st.columns(3)
     with t1:
-        st.markdown("#### Usuarios mais recorrentes")
-        st.dataframe(df["usuario_envio"].replace("", "Nao informado").value_counts().head(5), use_container_width=True)
+        st.markdown("#### Usuários mais recorrentes")
+        st.dataframe(df["usuario_envio"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
     with t2:
         st.markdown("#### Prestadores mais expostos")
-        st.dataframe(df["prestador"].replace("", "Nao informado").value_counts().head(5), use_container_width=True)
+        st.dataframe(df["prestador"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
     with t3:
         st.markdown("#### Pacientes mais recorrentes")
-        st.dataframe(df["paciente"].replace("", "Nao informado").value_counts().head(5), use_container_width=True)
+        st.dataframe(df["paciente"].replace("", "Não informado").value_counts().head(5), use_container_width=True)
 
     st.markdown("### Casos priorizados")
     colunas_top = [
@@ -648,17 +648,17 @@ render_hero()
 render_pitch()
 
 with st.sidebar:
-    st.markdown("## Modo de demonstracao")
+    st.markdown("## Modo de demonstração")
     usar_demo = st.button("Carregar demo guiada", use_container_width=True)
-    st.caption("A demo usa XMLs de exemplo ja publicados no repositorio.")
+    st.caption("A demo usa XMLs de exemplo já publicados no repositório.")
     st.markdown("---")
-    st.markdown("## Como vender em reuniao")
+    st.markdown("## Como vender em reunião")
     st.markdown(
         """
-        - mostre o resumo executivo
-        - abra os 10 casos priorizados
-        - destaque o valor em alerta
-        - exporte o CSV para provar operacionalizacao
+        - mostre o resumo executivo;
+        - abra os 10 casos priorizados;
+        - destaque o valor em alerta;
+        - exporte o CSV para provar operacionalização.
         """
     )
 
@@ -666,7 +666,7 @@ uploaded_files = st.file_uploader(
     "Suba XMLs reais ou de teste",
     type=["xml"],
     accept_multiple_files=True,
-    help="Voce pode usar seus XMLs ou acionar a demo guiada no menu lateral.",
+    help="Você pode usar seus XMLs ou acionar a demo guiada no menu lateral.",
 )
 
 origem = None
