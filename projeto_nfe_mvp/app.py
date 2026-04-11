@@ -183,8 +183,62 @@ st.markdown(
         margin-top: 10px;
     }
 
+    .summary-title,
+    .chart-title {
+        color: #152b4c;
+        font-size: 1rem;
+        font-weight: 800;
+        margin-bottom: 10px;
+    }
+
+    .summary-copy {
+        color: #4f6176;
+        font-size: 0.96rem;
+        line-height: 1.6;
+    }
+
+    .summary-copy strong {
+        color: #152b4c;
+    }
+
     .chart-wrap {
-        margin-top: 8px;
+        margin-top: 6px;
+    }
+
+    .chart-row {
+        display: grid;
+        grid-template-columns: 110px 1fr 36px;
+        align-items: center;
+        gap: 12px;
+        margin: 12px 0;
+    }
+
+    .chart-label {
+        color: #314760;
+        font-size: 0.82rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .chart-track {
+        background: #dce6f4;
+        height: 14px;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .chart-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4778b4 0%, #79a5d8 100%);
+        border-radius: 999px;
+    }
+
+    .chart-value {
+        color: #173761;
+        font-size: 0.95rem;
+        font-weight: 800;
+        text-align: right;
     }
 
     .risk-strip {
@@ -923,36 +977,50 @@ def render_results(df, origem):
     render_metric(c5, "blue", "Já vistos", resumo["vistos_historico"], "matches no histórico")
     render_metric(c6, "green", "Normais", resumo["normais"], "sem alerta relevante")
 
-    a1, a2 = st.columns([1.2, 1])
+    a1, a2 = st.columns(2)
     with a1:
         st.markdown(
             f"""
-            <div class="panel-card insight-box">
-                <strong>Resumo para decisor:</strong> {resumo["potencial_revisao"]} de {resumo["total"]} documentos
-                foram priorizados para revisão, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong>
-                em valor associado a alertas de score 60+. O histórico já reconheceu
-                <strong>{resumo["vistos_historico"]}</strong> documento(s) com vínculo anterior.
+            <div class="panel-card">
+                <div class="summary-title">Resumo para decisor</div>
+                <div class="summary-copy">
+                    <strong>{resumo["potencial_revisao"]}</strong> de <strong>{resumo["total"]}</strong> documentos foram
+                    priorizados para revisão, com <strong>{formatar_brl(resumo["valor_em_alerta"])}</strong> em valor
+                    associado a alertas de score 60+. O histórico já reconheceu
+                    <strong>{resumo["vistos_historico"]}</strong> documento(s) com vínculo anterior.
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
     with a2:
         top_classificacoes = df["classificacao_final"].value_counts().head(4)
+        max_valor = max(int(top_classificacoes.max()), 1) if not top_classificacoes.empty else 1
+        chart_rows = []
+        for categoria, quantidade in top_classificacoes.items():
+            largura = (int(quantidade) / max_valor) * 100
+            chart_rows.append(
+                f"""
+                <div class="chart-row">
+                    <div class="chart-label">{categoria}</div>
+                    <div class="chart-track">
+                        <div class="chart-fill" style="width:{largura:.2f}%"></div>
+                    </div>
+                    <div class="chart-value">{int(quantidade)}</div>
+                </div>
+                """
+            )
         st.markdown(
-            """
+            f"""
             <div class="panel-card">
-                <div class="section-title">Distribuição de alertas</div>
+                <div class="chart-title">Distribuição de alertas</div>
                 <div class="chart-wrap">
+                    {"".join(chart_rows)}
+                </div>
+            </div>
             """,
             unsafe_allow_html=True,
         )
-        max_valor = max(int(top_classificacoes.max()), 1) if not top_classificacoes.empty else 1
-        for categoria, quantidade in top_classificacoes.items():
-            l1, l2, l3 = st.columns([1.1, 4, 0.6])
-            l1.markdown(f"**{categoria}**")
-            l2.progress(int((int(quantidade) / max_valor) * 100))
-            l3.markdown(f"**{int(quantidade)}**")
-        st.markdown("</div></div>", unsafe_allow_html=True)
 
     r1, r2, r3 = st.columns(3)
     fraude = resumo_categoria(df, "FRAUDE FORTE")
