@@ -1796,10 +1796,18 @@ def render_results(df, origem):
             unsafe_allow_html=True,
         )
     with a2:
-        top_classificacoes = df["classificacao_final"].value_counts().head(4)
-        max_valor = max(int(top_classificacoes.max()), 1) if not top_classificacoes.empty else 1
+        distribuicao_alertas = pd.Series(
+            {
+                "REAPRESENTACAO": resumo["reapresentacao"],
+                "DUPLICIDADE": resumo["duplicidade"],
+                "SUSPEITO": resumo["comportamento"],
+                "NORMAL": resumo["normais"],
+            }
+        )
+        distribuicao_alertas = distribuicao_alertas[distribuicao_alertas > 0]
+        max_valor = max(int(distribuicao_alertas.max()), 1) if not distribuicao_alertas.empty else 1
         rows = []
-        for categoria, quantidade in top_classificacoes.items():
+        for categoria, quantidade in distribuicao_alertas.items():
             largura = (int(quantidade) / max_valor) * 100
             rows.append(
                 f'<div class="chart-row">'
