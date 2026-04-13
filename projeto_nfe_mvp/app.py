@@ -1,10 +1,18 @@
 from datetime import datetime
 import hashlib
+import os
 from pathlib import Path
+import re
 import sqlite3
 import xml.etree.ElementTree as ET
 
 import pandas as pd
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except Exception:  # pragma: no cover
+    psycopg = None
+    dict_row = None
 import streamlit as st
 
 st.set_page_config(
@@ -345,6 +353,28 @@ CONSULTA_CAMUFLADA_KEYWORDS = [
     "avaliacao",
 ]
 
+
+def get_database_url():
+    try:
+        if "DATABASE_URL" in st.secrets:
+            return st.secrets["DATABASE_URL"]
+    except Exception:
+        pass
+    return os.getenv("DATABASE_URL", "").strip()
+
+
+def is_postgres():
+    database_url = get_database_url()
+    return bool(database_url) and database_url.startswith(("postgres://", "postgresql://"))
+
+
+def adapt_query(query):
+    if not is_postgres():
+        return query
+    adapted = query.replace("?", "%s")
+    adapted = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", r"%(\1)s", adapted)
+    return adapted
+
 SEGMENT_COPY = {
     "Saúde": {
         "hero_title": "Revele duplicidades e sinais de reapresentação antes do reembolso sair.",
@@ -471,58 +501,129 @@ def extrair_sobrenome(nome):
 
 
 def get_db_connection():
+    if is_postgres():
+        if psycopg is None:
+            raise RuntimeError("psycopg não está instalado. Adicione a dependência para usar PostgreSQL.")
+        return psycopg.connect(get_database_url(), row_factory=dict_row)
     DB_DIR.mkdir(exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+def db_execute(conn, query, params=None):
+    if is_postgres():
+        with conn.cursor() as cur:
+            if params is None:
+                cur.execute(adapt_query(query))
+            else:
+                cur.execute(adapt_query(query), params)
+        return None
+    return conn.execute(query, params or ())
+
+
+def db_fetchone(conn, query, params=None):
+    if is_postgres():
+        with conn.cursor() as cur:
+            if params is None:
+                cur.execute(adapt_query(query))
+            else:
+                cur.execute(adapt_query(query), params)
+            return cur.fetchone()
+    return conn.execute(query, params or ()).fetchone()
+
+
+def db_executemany(conn, query, seq_params):
+    if is_postgres():
+        with conn.cursor() as cur:
+            cur.executemany(adapt_query(query), seq_params)
+        return None
+    return conn.executemany(query, seq_params)
+
+
 def inicializar_banco():
     with get_db_connection() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS nfe_documents (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                arquivo TEXT,
-                hash_arquivo TEXT,
-                id_nfe TEXT,
-                numero_nf TEXT,
-                serie TEXT,
-                data_emissao TEXT,
-                cnpj_emitente TEXT,
-                razao_social_emitente TEXT,
-                cnpj_destinatario TEXT,
-                valor_nf TEXT,
-                valor_nf_num REAL,
-                usuario_envio TEXT,
-                paciente TEXT,
-                cpf_paciente TEXT,
-                prestador TEXT,
-                procedimento TEXT,
-                data_atendimento TEXT,
-                evento_clinico TEXT,
-                guia_atendimento TEXT,
-                lote TEXT,
-                score_final REAL,
-                classificacao_final TEXT,
-                origem_upload TEXT,
-                analisado_em TEXT DEFAULT CURRENT_TIMESTAMP
+        if is_postgres():
+            db_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS nfe_documents (
+                    id BIGSERIAL PRIMARY KEY,
+                    arquivo TEXT,
+                    hash_arquivo TEXT,
+                    id_nfe TEXT,
+                    numero_nf TEXT,
+                    serie TEXT,
+                    data_emissao TEXT,
+                    cnpj_emitente TEXT,
+                    razao_social_emitente TEXT,
+                    cnpj_destinatario TEXT,
+                    valor_nf TEXT,
+                    valor_nf_num DOUBLE PRECISION,
+                    usuario_envio TEXT,
+                    paciente TEXT,
+                    cpf_paciente TEXT,
+                    prestador TEXT,
+                    procedimento TEXT,
+                    data_atendimento TEXT,
+                    evento_clinico TEXT,
+                    guia_atendimento TEXT,
+                    lote TEXT,
+                    score_final DOUBLE PRECISION,
+                    classificacao_final TEXT,
+                    origem_upload TEXT,
+                    analisado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
             )
-            """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_docs_hash ON nfe_documents(hash_arquivo)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_docs_id_nfe ON nfe_documents(id_nfe)")
-        conn.execute(
+        else:
+            db_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS nfe_documents (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    arquivo TEXT,
+                    hash_arquivo TEXT,
+                    id_nfe TEXT,
+                    numero_nf TEXT,
+                    serie TEXT,
+                    data_emissao TEXT,
+                    cnpj_emitente TEXT,
+                    razao_social_emitente TEXT,
+                    cnpj_destinatario TEXT,
+                    valor_nf TEXT,
+                    valor_nf_num REAL,
+                    usuario_envio TEXT,
+                    paciente TEXT,
+                    cpf_paciente TEXT,
+                    prestador TEXT,
+                    procedimento TEXT,
+                    data_atendimento TEXT,
+                    evento_clinico TEXT,
+                    guia_atendimento TEXT,
+                    lote TEXT,
+                    score_final REAL,
+                    classificacao_final TEXT,
+                    origem_upload TEXT,
+                    analisado_em TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+        db_execute(conn, "CREATE INDEX IF NOT EXISTS idx_docs_hash ON nfe_documents(hash_arquivo)")
+        db_execute(conn, "CREATE INDEX IF NOT EXISTS idx_docs_id_nfe ON nfe_documents(id_nfe)")
+        db_execute(
+            conn,
             """
             CREATE INDEX IF NOT EXISTS idx_docs_business
             ON nfe_documents(numero_nf, serie, cnpj_emitente, valor_nf)
-            """
+            """,
         )
-        conn.execute(
+        db_execute(
+            conn,
             """
             CREATE INDEX IF NOT EXISTS idx_docs_behavior
             ON nfe_documents(cpf_paciente, prestador, procedimento, data_atendimento)
-            """
+            """,
         )
         conn.commit()
 
@@ -530,7 +631,8 @@ def inicializar_banco():
 def load_history_stats():
     inicializar_banco()
     with get_db_connection() as conn:
-        row = conn.execute(
+        row = db_fetchone(
+            conn,
             """
             SELECT
                 COUNT(*) AS total_documentos,
@@ -539,7 +641,7 @@ def load_history_stats():
                 MAX(analisado_em) AS ultima_analise
             FROM nfe_documents
             """
-        ).fetchone()
+        )
     return {
         "total_documentos": row["total_documentos"] or 0,
         "hashes_unicos": row["hashes_unicos"] or 0,
@@ -549,8 +651,13 @@ def load_history_stats():
 
 
 def query_scalar(conn, query, params):
-    row = conn.execute(query, params).fetchone()
-    return row[0] if row and row[0] is not None else 0
+    row = db_fetchone(conn, query, params)
+    if not row:
+        return 0
+    if isinstance(row, dict):
+        valor = next(iter(row.values()), 0)
+        return valor if valor is not None else 0
+    return row[0] if row[0] is not None else 0
 
 
 def enrich_historico(df):
@@ -666,7 +773,8 @@ def carregar_referencias_crescimento(df):
             if not prestador or not procedimento:
                 continue
 
-            row = conn.execute(
+            row = db_fetchone(
+                conn,
                 """
                 SELECT
                     COUNT(*) AS total_registros,
@@ -686,7 +794,7 @@ def carregar_referencias_crescimento(df):
                 ) base
                 """,
                 (prestador, procedimento),
-            ).fetchone()
+            )
 
             referencias[(prestador, procedimento)] = {
                 "total_registros": int(row["total_registros"] or 0),
@@ -713,7 +821,8 @@ def carregar_referencias_quebra(df):
             if not prestador or not procedimento:
                 continue
 
-            row = conn.execute(
+            row = db_fetchone(
+                conn,
                 """
                 SELECT MAX(valor_nf_num) AS max_valor
                 FROM nfe_documents
@@ -722,7 +831,7 @@ def carregar_referencias_quebra(df):
                   AND valor_nf_num > 0
                 """,
                 (prestador, procedimento),
-            ).fetchone()
+            )
 
             referencias[(prestador, procedimento)] = float(row["max_valor"] or 0)
 
@@ -935,7 +1044,8 @@ def salvar_lote_no_historico(df, origem_upload):
     registros = df[colunas].fillna("").to_dict(orient="records")
 
     with get_db_connection() as conn:
-        conn.executemany(
+        db_executemany(
+            conn,
             """
             INSERT INTO nfe_documents (
                 arquivo, hash_arquivo, id_nfe, numero_nf, serie, data_emissao, cnpj_emitente,
