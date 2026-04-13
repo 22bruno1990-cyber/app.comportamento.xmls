@@ -750,7 +750,7 @@ def bootstrap_admin_user():
             if not verify_password(admin_password, existing["password_hash"]):
                 db_execute(
                     conn,
-                    "UPDATE app_users SET password_hash = ?, role = 'admin', active = 1 WHERE username = ?",
+                    "UPDATE app_users SET password_hash = ?, role = 'admin', active = TRUE WHERE username = ?",
                     (hash_password(admin_password), admin_username),
                 )
                 conn.commit()
@@ -760,7 +760,7 @@ def bootstrap_admin_user():
             conn,
             """
             INSERT INTO app_users (username, password_hash, role, active)
-            VALUES (?, ?, 'admin', 1)
+            VALUES (?, ?, 'admin', TRUE)
             """,
             (admin_username, hash_password(admin_password)),
         )
