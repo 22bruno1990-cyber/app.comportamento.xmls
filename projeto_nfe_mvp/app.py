@@ -343,6 +343,39 @@ st.markdown(
     .stTextInput input {
         color: #152b4c !important;
     }
+
+    .stTextInput > div > div,
+    .stTextInput div[data-baseweb="input"] {
+        background: #eef4ff !important;
+        border: 1px solid #b8cdee !important;
+        border-radius: 16px !important;
+        box-shadow: none !important;
+    }
+
+    .stTextInput input::placeholder {
+        color: #6c84a5 !important;
+    }
+
+    .stTextInput [data-testid="stMarkdownContainer"] p,
+    .stTextInput svg {
+        color: #5b7fb0 !important;
+        fill: #5b7fb0 !important;
+    }
+
+    .stButton > button,
+    .stForm button {
+        background: linear-gradient(135deg, #5b86bf 0%, #7fa7d8 100%) !important;
+        color: #ffffff !important;
+        border: 1px solid #6f96ca !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 24px rgba(77, 117, 170, 0.18) !important;
+    }
+
+    .stButton > button:hover,
+    .stForm button:hover {
+        background: linear-gradient(135deg, #4f79b0 0%, #729ccd 100%) !important;
+        border-color: #5b86bf !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
