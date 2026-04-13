@@ -2260,20 +2260,28 @@ uploaded_files = st.file_uploader(
     help=copy["upload_help"],
 )
 
-origem = None
-df = pd.DataFrame()
+if "analysis_df" not in st.session_state:
+    st.session_state["analysis_df"] = pd.DataFrame()
+if "analysis_origin" not in st.session_state:
+    st.session_state["analysis_origin"] = None
 
 if usar_demo:
-    df = processar_arquivos(carregar_demo())
-    origem = copy["demo_origin"]
+    st.session_state["analysis_df"] = processar_arquivos(carregar_demo())
+    st.session_state["analysis_origin"] = copy["demo_origin"]
 elif uploaded_files:
-    df = processar_arquivos(uploaded_files)
-    origem = copy["manual_origin"].format(qtd=len(uploaded_files))
+    st.session_state["analysis_df"] = processar_arquivos(uploaded_files)
+    st.session_state["analysis_origin"] = copy["manual_origin"].format(qtd=len(uploaded_files))
+
+df = st.session_state["analysis_df"]
+origem = st.session_state["analysis_origin"]
 
 if not df.empty:
     render_results(df, origem, copy)
     if st.button("Registrar este lote no histórico", use_container_width=True):
-        salvos = salvar_lote_no_historico(df, origem)
-        st.success(f"{salvos} documento(s) foram gravados no histórico antifraude.")
+        try:
+            salvos = salvar_lote_no_historico(df, origem)
+            st.success(f"{salvos} documento(s) foram gravados no histórico antifraude.")
+        except Exception as exc:
+            st.error(f"Não foi possível gravar no histórico: {exc}")
 else:
     render_empty_state(copy)
