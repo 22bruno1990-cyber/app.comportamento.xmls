@@ -326,6 +326,23 @@ st.markdown(
         font-size: 0.82rem;
         font-weight: 700;
     }
+
+    .stTextInput label,
+    .stTextInput div[data-testid="stWidgetLabel"],
+    .stRadio label,
+    .stRadio div[data-testid="stWidgetLabel"],
+    .stFileUploader label,
+    .stFileUploader div[data-testid="stWidgetLabel"],
+    .stMarkdown h3,
+    .stMarkdown h4,
+    .stCaptionContainer,
+    div[data-testid="stCaptionContainer"] {
+        color: #152b4c !important;
+    }
+
+    .stTextInput input {
+        color: #152b4c !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
