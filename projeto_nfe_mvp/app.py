@@ -2466,29 +2466,6 @@ with st.sidebar:
     historico = load_history_stats()
     segmento = st.radio("Segmento da apresentação", list(SEGMENT_COPY.keys()), index=0)
     copy = SEGMENT_COPY[segmento]
-    admin_username, admin_password = get_admin_credentials()
-    st.markdown("## Acesso master")
-    if st.session_state["auth_user"]:
-        st.success(
-            f'Conectado como **{st.session_state["auth_user"]["username"]}** ({st.session_state["auth_user"]["role"]})'
-        )
-        if st.button("Sair", use_container_width=True):
-            st.session_state["auth_user"] = None
-            st.rerun()
-    elif admin_username and admin_password:
-        with st.form("login_master"):
-            username_input = st.text_input("Usuário")
-            password_input = st.text_input("Senha", type="password")
-            entrou = st.form_submit_button("Entrar", use_container_width=True)
-        if entrou:
-            auth_user = authenticate_user(username_input, password_input)
-            if auth_user:
-                st.session_state["auth_user"] = auth_user
-                st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos.")
-    else:
-        st.info("Configure `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o login master.")
     st.markdown("---")
     st.markdown("## Modo de demonstração")
     usar_demo = st.button("Carregar demo guiada", use_container_width=True)
@@ -2503,24 +2480,65 @@ with st.sidebar:
         - último lote processado: **{historico["ultima_analise"]}**
         """
     )
-    if st.session_state["auth_user"]:
-        lotes_df = load_batch_history()
-        st.markdown("---")
-        st.markdown("## Histórico de lotes")
-        if lotes_df.empty:
-            st.caption("Nenhum lote registrado ainda.")
-        else:
-            st.dataframe(lotes_df, use_container_width=True, hide_index=True)
 
 render_hero(copy)
 render_pitch(copy)
 
-uploaded_files = st.file_uploader(
-    copy["upload_label"],
-    type=["xml"],
-    accept_multiple_files=True,
-    help=copy["upload_help"],
-)
+admin_username, admin_password = get_admin_credentials()
+
+st.markdown("### Acesso do cliente")
+if st.session_state["auth_user"]:
+    st.success(
+        f'Acesso validado para **{st.session_state["auth_user"]["username"]}** com perfil **{st.session_state["auth_user"]["role"]}**.'
+    )
+    auth_col1, auth_col2 = st.columns([2, 1])
+    with auth_col1:
+        st.caption("Upload, gravação no histórico e gestão de lotes liberados para a conta autenticada.")
+    with auth_col2:
+        if st.button("Encerrar sessão", use_container_width=True):
+            st.session_state["auth_user"] = None
+            st.rerun()
+else:
+    st.info("A demo pública continua aberta. Para subir XMLs e operar o histórico, valide o acesso do cliente.")
+    if admin_username and admin_password:
+        with st.form("login_master_body"):
+            login_col1, login_col2, login_col3 = st.columns([1.2, 1.2, 0.8])
+            with login_col1:
+                username_input = st.text_input("Usuário")
+            with login_col2:
+                password_input = st.text_input("Senha", type="password")
+            with login_col3:
+                st.write("")
+                st.write("")
+                entrou = st.form_submit_button("Entrar", use_container_width=True)
+        if entrou:
+            auth_user = authenticate_user(username_input, password_input)
+            if auth_user:
+                st.session_state["auth_user"] = auth_user
+                st.rerun()
+            else:
+                st.error("Usuário ou senha inválidos.")
+    else:
+        st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
+
+if st.session_state["auth_user"]:
+    lotes_df = load_batch_history()
+    st.markdown("### Histórico de lotes")
+    if lotes_df.empty:
+        st.caption("Nenhum lote registrado ainda.")
+    else:
+        st.dataframe(lotes_df, use_container_width=True, hide_index=True)
+
+if st.session_state["auth_user"]:
+    uploaded_files = st.file_uploader(
+        copy["upload_label"],
+        type=["xml"],
+        accept_multiple_files=True,
+        help=copy["upload_help"],
+    )
+else:
+    uploaded_files = []
+    st.caption("O upload é liberado após autenticação. Enquanto isso, você pode usar a demo guiada para apresentar a solução.")
 
 if "analysis_df" not in st.session_state:
     st.session_state["analysis_df"] = pd.DataFrame()
