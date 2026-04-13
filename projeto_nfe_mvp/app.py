@@ -376,6 +376,19 @@ st.markdown(
         background: linear-gradient(135deg, #4f79b0 0%, #729ccd 100%) !important;
         border-color: #5b86bf !important;
     }
+
+    section[data-testid="stSidebar"] .stMarkdown h2,
+    section[data-testid="stSidebar"] .stMarkdown h3,
+    section[data-testid="stSidebar"] .stMarkdown h4,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] div[data-testid="stWidgetLabel"],
+    section[data-testid="stSidebar"] div[data-testid="stCaptionContainer"] {
+        color: #f2f6ff !important;
+    }
+
+    section[data-testid="stSidebar"] .stCaptionContainer {
+        color: #c9d8f2 !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
