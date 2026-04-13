@@ -1,9 +1,11 @@
 from datetime import datetime
 import hashlib
+import hmac
 import os
 from pathlib import Path
 import re
 import sqlite3
+import uuid
 import xml.etree.ElementTree as ET
 
 import pandas as pd
@@ -533,12 +535,56 @@ def db_fetchone(conn, query, params=None):
     return conn.execute(query, params or ()).fetchone()
 
 
+def db_fetchall(conn, query, params=None):
+    if is_postgres():
+        with conn.cursor() as cur:
+            if params is None:
+                cur.execute(adapt_query(query))
+            else:
+                cur.execute(adapt_query(query), params)
+            return cur.fetchall()
+    return conn.execute(query, params or ()).fetchall()
+
+
 def db_executemany(conn, query, seq_params):
     if is_postgres():
         with conn.cursor() as cur:
             cur.executemany(adapt_query(query), seq_params)
         return None
     return conn.executemany(query, seq_params)
+
+
+def hash_password(password, salt=None):
+    salt = salt or os.urandom(16)
+    password_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 150000)
+    return f"{salt.hex()}${password_hash.hex()}"
+
+
+def verify_password(password, stored_hash):
+    try:
+        salt_hex, password_hash_hex = stored_hash.split("$", 1)
+        recalculated = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            bytes.fromhex(salt_hex),
+            150000,
+        ).hex()
+        return hmac.compare_digest(recalculated, password_hash_hex)
+    except Exception:
+        return False
+
+
+def get_admin_credentials():
+    admin_username = ""
+    admin_password = ""
+    try:
+        admin_username = st.secrets.get("ADMIN_USERNAME", "")
+        admin_password = st.secrets.get("ADMIN_PASSWORD", "")
+    except Exception:
+        pass
+    admin_username = admin_username or os.getenv("ADMIN_USERNAME", "")
+    admin_password = admin_password or os.getenv("ADMIN_PASSWORD", "")
+    return admin_username.strip(), admin_password.strip()
 
 
 def inicializar_banco():
@@ -625,6 +671,99 @@ def inicializar_banco():
             ON nfe_documents(cpf_paciente, prestador, procedimento, data_atendimento)
             """,
         )
+        if is_postgres():
+            db_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS app_users (
+                    id BIGSERIAL PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'master',
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            db_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS upload_batches (
+                    id BIGSERIAL PRIMARY KEY,
+                    batch_ref TEXT UNIQUE NOT NULL,
+                    batch_name TEXT,
+                    origem_upload TEXT,
+                    segment TEXT,
+                    uploaded_by TEXT,
+                    total_documentos INTEGER,
+                    total_alertas INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+        else:
+            db_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS app_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'master',
+                    active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            db_execute(
+                conn,
+                """
+                CREATE TABLE IF NOT EXISTS upload_batches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_ref TEXT UNIQUE NOT NULL,
+                    batch_name TEXT,
+                    origem_upload TEXT,
+                    segment TEXT,
+                    uploaded_by TEXT,
+                    total_documentos INTEGER,
+                    total_alertas INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+        conn.commit()
+    bootstrap_admin_user()
+
+
+def bootstrap_admin_user():
+    admin_username, admin_password = get_admin_credentials()
+    if not admin_username or not admin_password:
+        return
+
+    with get_db_connection() as conn:
+        existing = db_fetchone(
+            conn,
+            "SELECT username, password_hash FROM app_users WHERE username = ?",
+            (admin_username,),
+        )
+        if existing:
+            if not verify_password(admin_password, existing["password_hash"]):
+                db_execute(
+                    conn,
+                    "UPDATE app_users SET password_hash = ?, role = 'admin', active = 1 WHERE username = ?",
+                    (hash_password(admin_password), admin_username),
+                )
+                conn.commit()
+            return
+
+        db_execute(
+            conn,
+            """
+            INSERT INTO app_users (username, password_hash, role, active)
+            VALUES (?, ?, 'admin', 1)
+            """,
+            (admin_username, hash_password(admin_password)),
+        )
         conn.commit()
 
 
@@ -648,6 +787,88 @@ def load_history_stats():
         "ids_unicos": row["ids_unicos"] or 0,
         "ultima_analise": row["ultima_analise"] or "Sem histórico ainda",
     }
+
+
+def authenticate_user(username, password):
+    inicializar_banco()
+    if not username or not password:
+        return None
+
+    with get_db_connection() as conn:
+        user = db_fetchone(
+            conn,
+            """
+            SELECT username, password_hash, role, active
+            FROM app_users
+            WHERE username = ?
+            """,
+            (username.strip(),),
+        )
+
+    if not user:
+        return None
+    if not bool(user["active"]):
+        return None
+    if not verify_password(password, user["password_hash"]):
+        return None
+    return {"username": user["username"], "role": user["role"]}
+
+
+def registrar_lote_upload(df, origem_upload, segment, uploaded_by):
+    inicializar_banco()
+    batch_ref = f"lote_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    batch_name = ""
+    if "lote" in df.columns:
+        nomes_lote = sorted({str(valor).strip() for valor in df["lote"].fillna("") if str(valor).strip()})
+        if nomes_lote:
+            batch_name = ", ".join(nomes_lote[:3])
+    if not batch_name:
+        batch_name = batch_ref
+
+    total_alertas = int((df["score_final"] >= 60).sum()) if "score_final" in df.columns else 0
+
+    with get_db_connection() as conn:
+        db_execute(
+            conn,
+            """
+            INSERT INTO upload_batches (
+                batch_ref, batch_name, origem_upload, segment, uploaded_by, total_documentos, total_alertas
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                batch_ref,
+                batch_name,
+                origem_upload,
+                segment,
+                uploaded_by,
+                int(len(df)),
+                total_alertas,
+            ),
+        )
+        conn.commit()
+    return batch_ref
+
+
+def load_batch_history(limit=12):
+    inicializar_banco()
+    with get_db_connection() as conn:
+        rows = db_fetchall(
+            conn,
+            f"""
+            SELECT batch_ref, batch_name, segment, uploaded_by, total_documentos, total_alertas, created_at
+            FROM upload_batches
+            ORDER BY created_at DESC
+            LIMIT {int(limit)}
+            """,
+        )
+    normalizados = []
+    for row in rows:
+        if isinstance(row, dict):
+            normalizados.append(row)
+        else:
+            normalizados.append(dict(row))
+    return pd.DataFrame(normalizados)
 
 
 def query_scalar(conn, query, params):
@@ -1015,8 +1236,9 @@ def enrich_advanced_patterns(df):
     return df
 
 
-def salvar_lote_no_historico(df, origem_upload):
+def salvar_lote_no_historico(df, origem_upload, segment="Saúde", uploaded_by="sistema"):
     inicializar_banco()
+    batch_ref = registrar_lote_upload(df, origem_upload, segment, uploaded_by)
     colunas = [
         "arquivo",
         "hash_arquivo",
@@ -1060,7 +1282,13 @@ def salvar_lote_no_historico(df, origem_upload):
                 :guia_atendimento, :lote, :score_final, :classificacao_final, :origem_upload
             )
             """,
-            [{**registro, "origem_upload": origem_upload} for registro in registros],
+            [
+                {
+                    **registro,
+                    "origem_upload": f"{origem_upload} | batch_ref={batch_ref} | uploaded_by={uploaded_by}",
+                }
+                for registro in registros
+            ],
         )
         conn.commit()
     return len(registros)
@@ -2232,9 +2460,35 @@ def render_results(df, origem, copy):
 
 
 with st.sidebar:
+    if "auth_user" not in st.session_state:
+        st.session_state["auth_user"] = None
+
     historico = load_history_stats()
     segmento = st.radio("Segmento da apresentação", list(SEGMENT_COPY.keys()), index=0)
     copy = SEGMENT_COPY[segmento]
+    admin_username, admin_password = get_admin_credentials()
+    st.markdown("## Acesso master")
+    if st.session_state["auth_user"]:
+        st.success(
+            f'Conectado como **{st.session_state["auth_user"]["username"]}** ({st.session_state["auth_user"]["role"]})'
+        )
+        if st.button("Sair", use_container_width=True):
+            st.session_state["auth_user"] = None
+            st.rerun()
+    elif admin_username and admin_password:
+        with st.form("login_master"):
+            username_input = st.text_input("Usuário")
+            password_input = st.text_input("Senha", type="password")
+            entrou = st.form_submit_button("Entrar", use_container_width=True)
+        if entrou:
+            auth_user = authenticate_user(username_input, password_input)
+            if auth_user:
+                st.session_state["auth_user"] = auth_user
+                st.rerun()
+            else:
+                st.error("Usuário ou senha inválidos.")
+    else:
+        st.info("Configure `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o login master.")
     st.markdown("---")
     st.markdown("## Modo de demonstração")
     usar_demo = st.button("Carregar demo guiada", use_container_width=True)
@@ -2249,6 +2503,14 @@ with st.sidebar:
         - último lote processado: **{historico["ultima_analise"]}**
         """
     )
+    if st.session_state["auth_user"]:
+        lotes_df = load_batch_history()
+        st.markdown("---")
+        st.markdown("## Histórico de lotes")
+        if lotes_df.empty:
+            st.caption("Nenhum lote registrado ainda.")
+        else:
+            st.dataframe(lotes_df, use_container_width=True, hide_index=True)
 
 render_hero(copy)
 render_pitch(copy)
@@ -2277,10 +2539,21 @@ origem = st.session_state["analysis_origin"]
 
 if not df.empty:
     render_results(df, origem, copy)
-    if st.button("Registrar este lote no histórico", use_container_width=True):
+    if st.button(
+        "Registrar este lote no histórico",
+        use_container_width=True,
+        disabled=st.session_state.get("auth_user") is None,
+        help="Disponível para usuários master autenticados.",
+    ):
         try:
-            salvos = salvar_lote_no_historico(df, origem)
+            salvos = salvar_lote_no_historico(
+                df,
+                origem,
+                segment=segmento,
+                uploaded_by=st.session_state["auth_user"]["username"],
+            )
             st.success(f"{salvos} documento(s) foram gravados no histórico antifraude.")
+            st.rerun()
         except Exception as exc:
             st.error(f"Não foi possível gravar no histórico: {exc}")
 else:
