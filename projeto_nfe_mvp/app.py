@@ -2246,7 +2246,7 @@ with st.sidebar:
         - documentos salvos: **{historico["total_documentos"]}**
         - hashes únicos: **{historico["hashes_unicos"]}**
         - IDs únicos: **{historico["ids_unicos"]}**
-        - última ingestão: **{historico["ultima_analise"]}**
+        - último lote processado: **{historico["ultima_analise"]}**
         """
     )
 
