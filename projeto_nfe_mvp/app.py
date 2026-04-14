@@ -391,112 +391,74 @@ st.markdown(
         color: #c9d8f2 !important;
     }
 
-    .login-shell {
-        min-height: calc(100vh - 4rem);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
+    .login-page .stApp {
+        background:
+            linear-gradient(180deg, rgba(2, 8, 26, 0.66) 0%, rgba(3, 10, 30, 0.82) 100%),
+            radial-gradient(circle at 50% 20%, rgba(86, 214, 255, 0.18), transparent 18%);
+        background-attachment: fixed;
     }
 
-    .login-bg {
-        width: 100%;
-        min-height: calc(100vh - 4rem);
-        border-radius: 30px;
-        position: relative;
-        overflow: hidden;
+    .login-page [data-testid="stAppViewContainer"] {
         background:
-            radial-gradient(circle at 50% 28%, rgba(84, 214, 255, 0.25), transparent 16%),
-            radial-gradient(circle at 28% 26%, rgba(44, 130, 255, 0.20), transparent 20%),
-            radial-gradient(circle at 72% 30%, rgba(163, 255, 104, 0.18), transparent 20%),
-            linear-gradient(180deg, rgba(2, 8, 26, 0.94) 0%, rgba(3, 10, 30, 0.98) 100%);
-        box-shadow: 0 24px 80px rgba(4, 12, 32, 0.45);
+            linear-gradient(180deg, rgba(2, 8, 26, 0.68) 0%, rgba(3, 10, 30, 0.84) 100%);
+    }
+
+    .login-stage {
+        min-height: calc(100vh - 3rem);
         display: flex;
         align-items: center;
         justify-content: center;
     }
 
-    .login-bg::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background:
-            radial-gradient(circle at center, rgba(8, 22, 56, 0.14), rgba(3, 10, 30, 0.62)),
-            rgba(2, 8, 26, 0.10);
-        z-index: 1;
-    }
-
-    .login-panel {
-        width: min(360px, calc(100vw - 48px));
+    .login-card {
+        background: rgba(8, 18, 42, 0.56);
+        border: 1px solid rgba(173, 205, 245, 0.24);
+        backdrop-filter: blur(18px);
+        border-radius: 24px;
+        padding: 20px 20px 16px 20px;
+        box-shadow: 0 28px 64px rgba(4, 12, 32, 0.42);
+        max-width: 360px;
         margin: 0 auto;
-        padding: 24px;
-        text-align: center;
-        position: relative;
-        z-index: 3;
-    }
-
-    .login-brand-bg {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2;
-        pointer-events: none;
-    }
-
-    .login-brand {
-        width: min(620px, 82vw);
-        opacity: 0.82;
-        filter: drop-shadow(0 22px 60px rgba(52, 173, 255, 0.24));
     }
 
     .login-title {
         color: #f7fbff;
-        font-size: 1.15rem;
+        font-size: 1.08rem;
         font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 6px;
+        text-align: center;
+        margin-bottom: 4px;
     }
 
     .login-copy {
-        color: #c8d8ef;
-        font-size: 0.92rem;
-        line-height: 1.55;
-        margin: 0 auto 16px auto;
-        max-width: 280px;
-    }
-
-    .login-card {
-        background: rgba(9, 20, 45, 0.48);
-        border: 1px solid rgba(169, 203, 244, 0.20);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 18px;
-        box-shadow: 0 22px 54px rgba(4, 12, 32, 0.38);
+        color: #c6d7ef;
+        font-size: 0.88rem;
+        line-height: 1.45;
+        text-align: center;
+        margin-bottom: 14px;
     }
 
     .login-helper {
-        color: #a9c0e0;
-        font-size: 0.82rem;
+        color: #b0c7e6;
+        font-size: 0.8rem;
+        text-align: center;
         margin-top: 10px;
     }
 
     .login-card .stTextInput label,
     .login-card .stTextInput div[data-testid="stWidgetLabel"] {
-        color: #f2f7ff !important;
+        color: #eef4ff !important;
     }
 
     .login-card .stTextInput > div > div,
     .login-card .stTextInput div[data-baseweb="input"] {
-        background: rgba(232, 241, 255, 0.96) !important;
-        border: 1px solid rgba(141, 177, 224, 0.55) !important;
-        border-radius: 16px !important;
+        background: rgba(244, 248, 255, 0.95) !important;
+        border: 1px solid rgba(141, 177, 224, 0.50) !important;
+        border-radius: 14px !important;
     }
 
     .login-card .stButton > button,
     .login-card .stForm button {
-        min-height: 52px !important;
+        min-height: 46px !important;
         font-weight: 800 !important;
     }
     </style>
@@ -1058,49 +1020,61 @@ def render_login_cover():
         """
         <style>
         section[data-testid="stSidebar"] {display: none !important;}
+        header[data-testid="stHeader"] {display: none !important;}
+        .block-container {padding-top: 0 !important; padding-bottom: 0 !important; max-width: none !important;}
         </style>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="login-shell"><div class="login-bg">', unsafe_allow_html=True)
     if logo_base64:
         st.markdown(
-            f'<div class="login-brand-bg"><img class="login-brand" src="data:image/png;base64,{logo_base64}" alt="Solvyx" /></div>',
+            f"""
+            <style>
+            .stApp, [data-testid="stAppViewContainer"] {{
+                background:
+                    linear-gradient(180deg, rgba(2, 8, 26, 0.60) 0%, rgba(3, 10, 30, 0.82) 100%),
+                    url("data:image/png;base64,{logo_base64}") center center / cover no-repeat fixed !important;
+            }}
+            </style>
+            """,
             unsafe_allow_html=True,
         )
-    st.markdown('<div class="login-panel">', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="login-card">
-        <div class="login-title">Acesso seguro</div>
-        <div class="login-copy">
-            Entre para acessar o ambiente operacional da plataforma.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
-    admin_username, admin_password = get_admin_credentials()
-    if admin_username and admin_password:
-        with st.form("login_cover_form"):
-            username_input = st.text_input("Usuário", key="cover_username")
-            password_input = st.text_input("Senha", type="password", key="cover_password")
-            entrou = st.form_submit_button("Entrar", use_container_width=True)
-        st.markdown(
-            '<div class="login-helper">Acesso restrito a usuários autorizados.</div></div>',
-            unsafe_allow_html=True,
-        )
-        if entrou:
-            auth_user = authenticate_user(username_input, password_input)
-            if auth_user:
-                st.session_state["auth_user"] = auth_user
-                st.rerun()
+    top_space, middle_space, bottom_space = st.columns([1, 5, 1])
+    with middle_space:
+        st.markdown('<div class="login-stage">', unsafe_allow_html=True)
+        _, center_col, _ = st.columns([1.3, 1, 1.3])
+        with center_col:
+            st.markdown(
+                """
+                <div class="login-card">
+                <div class="login-title">Acesso seguro</div>
+                <div class="login-copy">Entre para acessar o ambiente operacional da plataforma.</div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            admin_username, admin_password = get_admin_credentials()
+            if admin_username and admin_password:
+                with st.form("login_cover_form"):
+                    username_input = st.text_input("Usuário", key="cover_username")
+                    password_input = st.text_input("Senha", type="password", key="cover_password")
+                    entrou = st.form_submit_button("Entrar", use_container_width=True)
+                st.markdown(
+                    '<div class="login-helper">Acesso restrito a usuários autorizados.</div></div>',
+                    unsafe_allow_html=True,
+                )
+                if entrou:
+                    auth_user = authenticate_user(username_input, password_input)
+                    if auth_user:
+                        st.session_state["auth_user"] = auth_user
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha inválidos.")
             else:
-                st.error("Usuário ou senha inválidos.")
-    else:
-        st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
+                st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
 
-    st.markdown('</div></div></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def query_scalar(conn, query, params):
