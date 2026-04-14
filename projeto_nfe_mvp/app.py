@@ -415,7 +415,7 @@ st.markdown(
         border: 1px solid rgba(173, 205, 245, 0.24);
         backdrop-filter: blur(18px);
         border-radius: 24px;
-        padding: 20px 20px 16px 20px;
+        padding: 10px 16px 10px 16px;
         box-shadow: 0 28px 64px rgba(4, 12, 32, 0.42);
         max-width: 360px;
         margin: 0 auto;
@@ -441,7 +441,7 @@ st.markdown(
         color: #b0c7e6;
         font-size: 0.8rem;
         text-align: center;
-        margin-top: 10px;
+        margin-top: 6px;
     }
 
     .login-card .stTextInput label,
@@ -460,6 +460,19 @@ st.markdown(
     .login-card .stForm button {
         min-height: 46px !important;
         font-weight: 800 !important;
+    }
+
+    .login-card .stForm {
+        margin-top: 0 !important;
+    }
+
+    .login-card [data-testid="stForm"] {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    .login-card .stTextInput {
+        margin-bottom: 0.35rem !important;
     }
     </style>
     """,
