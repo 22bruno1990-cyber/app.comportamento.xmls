@@ -1034,7 +1034,15 @@ def render_login_cover():
         <style>
         section[data-testid="stSidebar"] {display: none !important;}
         header[data-testid="stHeader"] {display: none !important;}
-        .block-container {padding-top: 0 !important; padding-bottom: 0 !important; max-width: none !important;}
+        .block-container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            max-width: none !important;
+            min-height: 100vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1053,32 +1061,27 @@ def render_login_cover():
             unsafe_allow_html=True,
         )
 
-    top_space, middle_space, bottom_space = st.columns([1, 5, 1])
-    with middle_space:
-        st.markdown('<div class="login-stage">', unsafe_allow_html=True)
-        _, center_col, _ = st.columns([1.3, 1, 1.3])
-        with center_col:
-            admin_username, admin_password = get_admin_credentials()
-            if admin_username and admin_password:
-                with st.form("login_cover_form"):
-                    username_input = st.text_input("Usuário", key="cover_username")
-                    password_input = st.text_input("Senha", type="password", key="cover_password")
-                    entrou = st.form_submit_button("Entrar", use_container_width=True)
-                st.markdown(
-                    '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
-                    unsafe_allow_html=True,
-                )
-                if entrou:
-                    auth_user = authenticate_user(username_input, password_input)
-                    if auth_user:
-                        st.session_state["auth_user"] = auth_user
-                        st.rerun()
-                    else:
-                        st.error("Usuário ou senha inválidos.")
-            else:
-                st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
-
-        st.markdown('</div>', unsafe_allow_html=True)
+    _, center_col, _ = st.columns([1.6, 1, 1.6])
+    with center_col:
+        admin_username, admin_password = get_admin_credentials()
+        if admin_username and admin_password:
+            with st.form("login_cover_form"):
+                username_input = st.text_input("Usuário", key="cover_username")
+                password_input = st.text_input("Senha", type="password", key="cover_password")
+                entrou = st.form_submit_button("Entrar", use_container_width=True)
+            st.markdown(
+                '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
+                unsafe_allow_html=True,
+            )
+            if entrou:
+                auth_user = authenticate_user(username_input, password_input)
+                if auth_user:
+                    st.session_state["auth_user"] = auth_user
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha inválidos.")
+        else:
+            st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
 
 
 def query_scalar(conn, query, params):
