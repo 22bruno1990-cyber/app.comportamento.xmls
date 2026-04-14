@@ -451,9 +451,24 @@ st.markdown(
 
     .login-stage .stTextInput > div > div,
     .login-stage .stTextInput div[data-baseweb="input"] {
-        background: rgba(244, 248, 255, 0.95) !important;
-        border: 1px solid rgba(141, 177, 224, 0.50) !important;
+        background: rgba(7, 19, 44, 0.72) !important;
+        border: 1px solid rgba(141, 177, 224, 0.42) !important;
         border-radius: 14px !important;
+    }
+
+    .login-stage .stTextInput input {
+        color: #f4f8ff !important;
+        caret-color: #f4f8ff !important;
+    }
+
+    .login-stage .stTextInput input::placeholder {
+        color: rgba(233, 241, 255, 0.70) !important;
+    }
+
+    .login-stage .stTextInput [data-testid="stMarkdownContainer"] p,
+    .login-stage .stTextInput svg {
+        color: #d9e7ff !important;
+        fill: #d9e7ff !important;
     }
 
     .login-stage .stButton > button,
