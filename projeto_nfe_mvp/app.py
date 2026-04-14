@@ -1041,7 +1041,7 @@ def render_login_cover():
             min-height: 100vh !important;
             display: flex !important;
             flex-direction: column !important;
-            justify-content: center !important;
+            justify-content: flex-start !important;
         }
         </style>
         """,
@@ -1061,6 +1061,7 @@ def render_login_cover():
             unsafe_allow_html=True,
         )
 
+    st.markdown('<div style="height: 22vh;"></div>', unsafe_allow_html=True)
     _, center_col, _ = st.columns([1.6, 1, 1.6])
     with center_col:
         admin_username, admin_password = get_admin_credentials()
