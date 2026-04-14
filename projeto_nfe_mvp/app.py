@@ -1,4 +1,5 @@
 from datetime import datetime
+import base64
 import hashlib
 import hmac
 import os
@@ -389,6 +390,93 @@ st.markdown(
     section[data-testid="stSidebar"] .stCaptionContainer {
         color: #c9d8f2 !important;
     }
+
+    .login-shell {
+        min-height: calc(100vh - 4rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+    }
+
+    .login-bg {
+        width: 100%;
+        min-height: calc(100vh - 4rem);
+        border-radius: 30px;
+        position: relative;
+        overflow: hidden;
+        background:
+            radial-gradient(circle at 50% 28%, rgba(84, 214, 255, 0.25), transparent 16%),
+            radial-gradient(circle at 28% 26%, rgba(44, 130, 255, 0.20), transparent 20%),
+            radial-gradient(circle at 72% 30%, rgba(163, 255, 104, 0.18), transparent 20%),
+            linear-gradient(180deg, rgba(2, 8, 26, 0.94) 0%, rgba(3, 10, 30, 0.98) 100%);
+        box-shadow: 0 24px 80px rgba(4, 12, 32, 0.45);
+    }
+
+    .login-panel {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 64px 40px;
+        text-align: center;
+        position: relative;
+        z-index: 2;
+    }
+
+    .login-brand {
+        width: min(340px, 72vw);
+        margin: 0 auto 18px auto;
+        display: block;
+        filter: drop-shadow(0 18px 48px rgba(52, 173, 255, 0.22));
+    }
+
+    .login-title {
+        color: #f7fbff;
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 12px;
+    }
+
+    .login-copy {
+        color: #c8d8ef;
+        font-size: 1rem;
+        line-height: 1.65;
+        margin: 0 auto 28px auto;
+        max-width: 430px;
+    }
+
+    .login-card {
+        background: rgba(244, 248, 255, 0.10);
+        border: 1px solid rgba(149, 186, 235, 0.18);
+        backdrop-filter: blur(16px);
+        border-radius: 24px;
+        padding: 22px;
+        box-shadow: 0 22px 54px rgba(4, 12, 32, 0.28);
+    }
+
+    .login-helper {
+        color: #a9c0e0;
+        font-size: 0.92rem;
+        margin-top: 14px;
+    }
+
+    .login-card .stTextInput label,
+    .login-card .stTextInput div[data-testid="stWidgetLabel"] {
+        color: #f2f7ff !important;
+    }
+
+    .login-card .stTextInput > div > div,
+    .login-card .stTextInput div[data-baseweb="input"] {
+        background: rgba(232, 241, 255, 0.96) !important;
+        border: 1px solid rgba(141, 177, 224, 0.55) !important;
+        border-radius: 16px !important;
+    }
+
+    .login-card .stButton > button,
+    .login-card .stForm button {
+        min-height: 52px !important;
+        font-weight: 800 !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -399,6 +487,8 @@ BASE_DIR = Path(__file__).resolve().parent
 DEMO_DIR = BASE_DIR / "xmls_ricos"
 DB_DIR = BASE_DIR / "data"
 DB_PATH = DB_DIR / "historico_nfe.db"
+ASSETS_DIR = BASE_DIR / "assets"
+LOGIN_LOGO_PATH = ASSETS_DIR / "solvyx-login.png"
 ESTETICA_KEYWORDS = [
     "estet",
     "beauty",
@@ -439,6 +529,12 @@ def adapt_query(query):
     adapted = query.replace("?", "%s")
     adapted = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", r"%(\1)s", adapted)
     return adapted
+
+
+def image_to_base64(path):
+    if not path.exists():
+        return ""
+    return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 SEGMENT_COPY = {
     "Saúde": {
@@ -932,6 +1028,58 @@ def load_batch_history(limit=12):
         else:
             normalizados.append(dict(row))
     return pd.DataFrame(normalizados)
+
+
+def render_login_cover():
+    logo_base64 = image_to_base64(LOGIN_LOGO_PATH)
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] {display: none !important;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="login-shell"><div class="login-bg"><div class="login-panel">', unsafe_allow_html=True)
+    if logo_base64:
+        st.markdown(
+            f'<img class="login-brand" src="data:image/png;base64,{logo_base64}" alt="Solvyx" />',
+            unsafe_allow_html=True,
+        )
+    st.markdown(
+        """
+        <div class="login-title">Portal de acesso</div>
+        <div class="login-copy">
+            Valide seu acesso para entrar no ambiente seguro da plataforma e operar uploads,
+            histórico e análise antifraude.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    admin_username, admin_password = get_admin_credentials()
+    if admin_username and admin_password:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        with st.form("login_cover_form"):
+            username_input = st.text_input("Usuário", key="cover_username")
+            password_input = st.text_input("Senha", type="password", key="cover_password")
+            entrou = st.form_submit_button("Entrar", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
+            unsafe_allow_html=True,
+        )
+        if entrou:
+            auth_user = authenticate_user(username_input, password_input)
+            if auth_user:
+                st.session_state["auth_user"] = auth_user
+                st.rerun()
+            else:
+                st.error("Usuário ou senha inválidos.")
+    else:
+        st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
+
+    st.markdown('</div></div></div>', unsafe_allow_html=True)
 
 
 def query_scalar(conn, query, params):
@@ -2521,14 +2669,25 @@ def render_results(df, origem, copy):
         mime="text/csv",
     )
 
+if "auth_user" not in st.session_state:
+    st.session_state["auth_user"] = None
+
+if not st.session_state["auth_user"]:
+    render_login_cover()
+    st.stop()
 
 with st.sidebar:
-    if "auth_user" not in st.session_state:
-        st.session_state["auth_user"] = None
-
     historico = load_history_stats()
     segmento = st.radio("Segmento da apresentação", list(SEGMENT_COPY.keys()), index=0)
     copy = SEGMENT_COPY[segmento]
+    st.markdown("## Sessão")
+    st.success(
+        f'Conectado como **{st.session_state["auth_user"]["username"]}** ({st.session_state["auth_user"]["role"]})'
+    )
+    if st.button("Encerrar sessão", use_container_width=True):
+        st.session_state["auth_user"] = None
+        st.rerun()
+    st.markdown("---")
     st.markdown("---")
     st.markdown("## Modo de demonstração")
     usar_demo = st.button("Carregar demo guiada", use_container_width=True)
@@ -2546,62 +2705,19 @@ with st.sidebar:
 
 render_hero(copy)
 render_pitch(copy)
-
-admin_username, admin_password = get_admin_credentials()
-
-st.markdown("### Acesso do cliente")
-if st.session_state["auth_user"]:
-    st.success(
-        f'Acesso validado para **{st.session_state["auth_user"]["username"]}** com perfil **{st.session_state["auth_user"]["role"]}**.'
-    )
-    auth_col1, auth_col2 = st.columns([2, 1])
-    with auth_col1:
-        st.caption("Upload, gravação no histórico e gestão de lotes liberados para a conta autenticada.")
-    with auth_col2:
-        if st.button("Encerrar sessão", use_container_width=True):
-            st.session_state["auth_user"] = None
-            st.rerun()
+st.markdown("### Histórico de lotes")
+lotes_df = load_batch_history()
+if lotes_df.empty:
+    st.caption("Nenhum lote registrado ainda.")
 else:
-    st.info("A demo pública continua aberta. Para subir XMLs e operar o histórico, valide o acesso do cliente.")
-    if admin_username and admin_password:
-        with st.form("login_master_body"):
-            login_col1, login_col2, login_col3 = st.columns([1.2, 1.2, 0.8])
-            with login_col1:
-                username_input = st.text_input("Usuário")
-            with login_col2:
-                password_input = st.text_input("Senha", type="password")
-            with login_col3:
-                st.write("")
-                st.write("")
-                entrou = st.form_submit_button("Entrar", use_container_width=True)
-        if entrou:
-            auth_user = authenticate_user(username_input, password_input)
-            if auth_user:
-                st.session_state["auth_user"] = auth_user
-                st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos.")
-    else:
-        st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
+    st.dataframe(lotes_df, use_container_width=True, hide_index=True)
 
-if st.session_state["auth_user"]:
-    lotes_df = load_batch_history()
-    st.markdown("### Histórico de lotes")
-    if lotes_df.empty:
-        st.caption("Nenhum lote registrado ainda.")
-    else:
-        st.dataframe(lotes_df, use_container_width=True, hide_index=True)
-
-if st.session_state["auth_user"]:
-    uploaded_files = st.file_uploader(
-        copy["upload_label"],
-        type=["xml"],
-        accept_multiple_files=True,
-        help=copy["upload_help"],
-    )
-else:
-    uploaded_files = []
-    st.caption("O upload é liberado após autenticação. Enquanto isso, você pode usar a demo guiada para apresentar a solução.")
+uploaded_files = st.file_uploader(
+    copy["upload_label"],
+    type=["xml"],
+    accept_multiple_files=True,
+    help=copy["upload_help"],
+)
 
 if "analysis_df" not in st.session_state:
     st.session_state["analysis_df"] = pd.DataFrame()
