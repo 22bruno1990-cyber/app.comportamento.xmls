@@ -1048,8 +1048,6 @@ def render_login_cover():
             st.markdown(
                 """
                 <div class="login-card">
-                <div class="login-title">Acesso seguro</div>
-                <div class="login-copy">Entre para acessar o ambiente operacional da plataforma.</div>
                 """,
                 unsafe_allow_html=True,
             )
