@@ -410,7 +410,7 @@ st.markdown(
         justify-content: center;
     }
 
-    .login-card {
+    .login-stage [data-testid="stForm"] {
         background: rgba(8, 18, 42, 0.56);
         border: 1px solid rgba(173, 205, 245, 0.24);
         backdrop-filter: blur(18px);
@@ -444,34 +444,34 @@ st.markdown(
         margin-top: 6px;
     }
 
-    .login-card .stTextInput label,
-    .login-card .stTextInput div[data-testid="stWidgetLabel"] {
+    .login-stage .stTextInput label,
+    .login-stage .stTextInput div[data-testid="stWidgetLabel"] {
         color: #eef4ff !important;
     }
 
-    .login-card .stTextInput > div > div,
-    .login-card .stTextInput div[data-baseweb="input"] {
+    .login-stage .stTextInput > div > div,
+    .login-stage .stTextInput div[data-baseweb="input"] {
         background: rgba(244, 248, 255, 0.95) !important;
         border: 1px solid rgba(141, 177, 224, 0.50) !important;
         border-radius: 14px !important;
     }
 
-    .login-card .stButton > button,
-    .login-card .stForm button {
+    .login-stage .stButton > button,
+    .login-stage .stForm button {
         min-height: 46px !important;
         font-weight: 800 !important;
     }
 
-    .login-card .stForm {
+    .login-stage .stForm {
         margin-top: 0 !important;
     }
 
-    .login-card [data-testid="stForm"] {
+    .login-stage [data-testid="stForm"] {
         padding-top: 0 !important;
         padding-bottom: 0 !important;
     }
 
-    .login-card .stTextInput {
+    .login-stage .stTextInput {
         margin-bottom: 0.35rem !important;
     }
     </style>
@@ -1058,13 +1058,6 @@ def render_login_cover():
         st.markdown('<div class="login-stage">', unsafe_allow_html=True)
         _, center_col, _ = st.columns([1.3, 1, 1.3])
         with center_col:
-            st.markdown(
-                """
-                <div class="login-card">
-                """,
-                unsafe_allow_html=True,
-            )
-
             admin_username, admin_password = get_admin_credentials()
             if admin_username and admin_password:
                 with st.form("login_cover_form"):
@@ -1072,7 +1065,7 @@ def render_login_cover():
                     password_input = st.text_input("Senha", type="password", key="cover_password")
                     entrou = st.form_submit_button("Entrar", use_container_width=True)
                 st.markdown(
-                    '<div class="login-helper">Acesso restrito a usuários autorizados.</div></div>',
+                    '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
                     unsafe_allow_html=True,
                 )
                 if entrou:
