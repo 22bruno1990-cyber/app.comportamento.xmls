@@ -396,7 +396,7 @@ st.markdown(
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 24px;
+        padding: 12px;
     }
 
     .login-bg {
@@ -411,53 +411,75 @@ st.markdown(
             radial-gradient(circle at 72% 30%, rgba(163, 255, 104, 0.18), transparent 20%),
             linear-gradient(180deg, rgba(2, 8, 26, 0.94) 0%, rgba(3, 10, 30, 0.98) 100%);
         box-shadow: 0 24px 80px rgba(4, 12, 32, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .login-bg::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at center, rgba(8, 22, 56, 0.14), rgba(3, 10, 30, 0.62)),
+            rgba(2, 8, 26, 0.10);
+        z-index: 1;
     }
 
     .login-panel {
-        max-width: 520px;
+        width: min(360px, calc(100vw - 48px));
         margin: 0 auto;
-        padding: 64px 40px;
+        padding: 24px;
         text-align: center;
         position: relative;
+        z-index: 3;
+    }
+
+    .login-brand-bg {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         z-index: 2;
+        pointer-events: none;
     }
 
     .login-brand {
-        width: min(340px, 72vw);
-        margin: 0 auto 18px auto;
-        display: block;
-        filter: drop-shadow(0 18px 48px rgba(52, 173, 255, 0.22));
+        width: min(620px, 82vw);
+        opacity: 0.82;
+        filter: drop-shadow(0 22px 60px rgba(52, 173, 255, 0.24));
     }
 
     .login-title {
         color: #f7fbff;
-        font-size: 2rem;
+        font-size: 1.15rem;
         font-weight: 800;
-        letter-spacing: -0.03em;
-        margin-bottom: 12px;
+        letter-spacing: -0.02em;
+        margin-bottom: 6px;
     }
 
     .login-copy {
         color: #c8d8ef;
-        font-size: 1rem;
-        line-height: 1.65;
-        margin: 0 auto 28px auto;
-        max-width: 430px;
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin: 0 auto 16px auto;
+        max-width: 280px;
     }
 
     .login-card {
-        background: rgba(244, 248, 255, 0.10);
-        border: 1px solid rgba(149, 186, 235, 0.18);
-        backdrop-filter: blur(16px);
+        background: rgba(9, 20, 45, 0.48);
+        border: 1px solid rgba(169, 203, 244, 0.20);
+        backdrop-filter: blur(20px);
         border-radius: 24px;
-        padding: 22px;
-        box-shadow: 0 22px 54px rgba(4, 12, 32, 0.28);
+        padding: 18px;
+        box-shadow: 0 22px 54px rgba(4, 12, 32, 0.38);
     }
 
     .login-helper {
         color: #a9c0e0;
-        font-size: 0.92rem;
-        margin-top: 14px;
+        font-size: 0.82rem;
+        margin-top: 10px;
     }
 
     .login-card .stTextInput label,
@@ -1040,18 +1062,19 @@ def render_login_cover():
         """,
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="login-shell"><div class="login-bg"><div class="login-panel">', unsafe_allow_html=True)
+    st.markdown('<div class="login-shell"><div class="login-bg">', unsafe_allow_html=True)
     if logo_base64:
         st.markdown(
-            f'<img class="login-brand" src="data:image/png;base64,{logo_base64}" alt="Solvyx" />',
+            f'<div class="login-brand-bg"><img class="login-brand" src="data:image/png;base64,{logo_base64}" alt="Solvyx" /></div>',
             unsafe_allow_html=True,
         )
+    st.markdown('<div class="login-panel">', unsafe_allow_html=True)
     st.markdown(
         """
-        <div class="login-title">Portal de acesso</div>
+        <div class="login-card">
+        <div class="login-title">Acesso seguro</div>
         <div class="login-copy">
-            Valide seu acesso para entrar no ambiente seguro da plataforma e operar uploads,
-            histórico e análise antifraude.
+            Entre para acessar o ambiente operacional da plataforma.
         </div>
         """,
         unsafe_allow_html=True,
@@ -1059,14 +1082,12 @@ def render_login_cover():
 
     admin_username, admin_password = get_admin_credentials()
     if admin_username and admin_password:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
         with st.form("login_cover_form"):
             username_input = st.text_input("Usuário", key="cover_username")
             password_input = st.text_input("Senha", type="password", key="cover_password")
             entrou = st.form_submit_button("Entrar", use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown(
-            '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
+            '<div class="login-helper">Acesso restrito a usuários autorizados.</div></div>',
             unsafe_allow_html=True,
         )
         if entrou:
