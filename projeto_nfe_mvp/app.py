@@ -451,10 +451,13 @@ st.markdown(
 
     .login-stage .stTextInput > div > div,
     .login-stage .stTextInput div[data-baseweb="input"],
+    .login-stage .stTextInput div[data-baseweb="input"] > div,
     .login-stage .stTextInput div[data-baseweb="base-input"],
+    .login-stage .stTextInput div[data-baseweb="base-input"] > div,
     .login-stage [data-testid="stTextInputRootElement"],
     .login-stage [data-testid="stTextInputRootElement"] > div {
-        background: rgba(7, 19, 44, 0.72) !important;
+        background: transparent !important;
+        background-color: rgba(7, 19, 44, 0.72) !important;
         border: 1px solid rgba(141, 177, 224, 0.42) !important;
         border-radius: 14px !important;
     }
@@ -463,18 +466,25 @@ st.markdown(
     .login-stage [data-testid="stTextInputRootElement"] input {
         color: #f4f8ff !important;
         caret-color: #f4f8ff !important;
-        background: rgba(7, 19, 44, 0.72) !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
         box-shadow: none !important;
         -webkit-text-fill-color: #f4f8ff !important;
-        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.72) inset !important;
+        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.001) inset !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
     }
 
     .login-stage input[type="text"],
     .login-stage input[type="password"] {
-        background: rgba(7, 19, 44, 0.72) !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
         color: #f4f8ff !important;
         -webkit-text-fill-color: #f4f8ff !important;
-        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.72) inset !important;
+        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.001) inset !important;
+        -webkit-appearance: none !important;
     }
 
     .login-stage input:-webkit-autofill,
@@ -482,8 +492,15 @@ st.markdown(
     .login-stage input:-webkit-autofill:focus,
     .login-stage input:-webkit-autofill:active {
         -webkit-text-fill-color: #f4f8ff !important;
-        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.72) inset !important;
+        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.001) inset !important;
         transition: background-color 9999s ease-in-out 0s;
+    }
+
+    .login-stage [data-baseweb="input"]::before,
+    .login-stage [data-baseweb="base-input"]::before,
+    .login-stage [data-baseweb="input"]::after,
+    .login-stage [data-baseweb="base-input"]::after {
+        background: transparent !important;
     }
 
     .login-stage .stTextInput input::placeholder {
