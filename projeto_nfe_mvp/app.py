@@ -450,18 +450,21 @@ st.markdown(
     }
 
     .login-stage .stTextInput > div > div,
-    .login-stage .stTextInput > div > div > input,
     .login-stage .stTextInput div[data-baseweb="input"],
-    .login-stage .stTextInput div[data-baseweb="base-input"] {
+    .login-stage .stTextInput div[data-baseweb="base-input"],
+    .login-stage [data-testid="stTextInputRootElement"],
+    .login-stage [data-testid="stTextInputRootElement"] > div {
         background: rgba(7, 19, 44, 0.72) !important;
         border: 1px solid rgba(141, 177, 224, 0.42) !important;
         border-radius: 14px !important;
     }
 
-    .login-stage .stTextInput input {
+    .login-stage .stTextInput input,
+    .login-stage [data-testid="stTextInputRootElement"] input {
         color: #f4f8ff !important;
         caret-color: #f4f8ff !important;
         background: rgba(7, 19, 44, 0.72) !important;
+        box-shadow: none !important;
     }
 
     .login-stage .stTextInput input::placeholder {
