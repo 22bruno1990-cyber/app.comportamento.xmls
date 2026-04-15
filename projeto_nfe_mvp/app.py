@@ -392,6 +392,7 @@ st.markdown(
     }
 
     .login-page .stApp {
+        color-scheme: dark;
         background:
             linear-gradient(180deg, rgba(2, 8, 26, 0.66) 0%, rgba(3, 10, 30, 0.82) 100%),
             radial-gradient(circle at 50% 20%, rgba(86, 214, 255, 0.18), transparent 18%);
@@ -399,6 +400,7 @@ st.markdown(
     }
 
     .login-page [data-testid="stAppViewContainer"] {
+        color-scheme: dark;
         background:
             linear-gradient(180deg, rgba(2, 8, 26, 0.68) 0%, rgba(3, 10, 30, 0.84) 100%);
     }
@@ -411,6 +413,7 @@ st.markdown(
     }
 
     .login-stage [data-testid="stForm"] {
+        color-scheme: dark;
         background: rgba(8, 18, 42, 0.56);
         border: 1px solid rgba(173, 205, 245, 0.24);
         backdrop-filter: blur(18px);
@@ -456,6 +459,7 @@ st.markdown(
     .login-stage .stTextInput div[data-baseweb="base-input"] > div,
     .login-stage [data-testid="stTextInputRootElement"],
     .login-stage [data-testid="stTextInputRootElement"] > div {
+        color-scheme: dark !important;
         background: transparent !important;
         background-color: rgba(7, 19, 44, 0.72) !important;
         border: 1px solid rgba(141, 177, 224, 0.42) !important;
@@ -464,6 +468,7 @@ st.markdown(
 
     .login-stage .stTextInput input,
     .login-stage [data-testid="stTextInputRootElement"] input {
+        color-scheme: dark !important;
         color: #f4f8ff !important;
         caret-color: #f4f8ff !important;
         background: transparent !important;
