@@ -465,6 +465,25 @@ st.markdown(
         caret-color: #f4f8ff !important;
         background: rgba(7, 19, 44, 0.72) !important;
         box-shadow: none !important;
+        -webkit-text-fill-color: #f4f8ff !important;
+        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.72) inset !important;
+    }
+
+    .login-stage input[type="text"],
+    .login-stage input[type="password"] {
+        background: rgba(7, 19, 44, 0.72) !important;
+        color: #f4f8ff !important;
+        -webkit-text-fill-color: #f4f8ff !important;
+        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.72) inset !important;
+    }
+
+    .login-stage input:-webkit-autofill,
+    .login-stage input:-webkit-autofill:hover,
+    .login-stage input:-webkit-autofill:focus,
+    .login-stage input:-webkit-autofill:active {
+        -webkit-text-fill-color: #f4f8ff !important;
+        -webkit-box-shadow: 0 0 0 1000px rgba(7, 19, 44, 0.72) inset !important;
+        transition: background-color 9999s ease-in-out 0s;
     }
 
     .login-stage .stTextInput input::placeholder {
