@@ -1403,6 +1403,12 @@ def delete_batch(batch_ref):
 
 
 def render_batch_metric(col, label, value, sub=None):
+    value_text = str(value)
+    value_font_size = "2rem"
+    if len(value_text) >= 12:
+        value_font_size = "1.55rem"
+    if len(value_text) >= 16:
+        value_font_size = "1.3rem"
     extra = (
         f'<div style="font-size:0.92rem; font-weight:700; color:#5b6d84; margin-top:10px; white-space:nowrap;">{sub}</div>'
         if sub is not None
@@ -1410,9 +1416,9 @@ def render_batch_metric(col, label, value, sub=None):
     )
     col.markdown(
         f"""
-        <div class="glass-card" style="padding:16px 18px; min-height:120px;">
+        <div class="glass-card" style="padding:16px 18px; min-height:120px; overflow:hidden;">
             <div class="section-title" style="font-size:0.95rem; margin-bottom:10px;">{label}</div>
-            <div style="font-size:2rem; font-weight:800; color:#152b4c; white-space:nowrap;">{value}</div>
+            <div style="font-size:{value_font_size}; font-weight:800; color:#152b4c; line-height:1.15; word-break:break-word; overflow-wrap:anywhere;">{value}</div>
             {extra}
         </div>
         """,
