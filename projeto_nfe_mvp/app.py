@@ -3211,6 +3211,8 @@ def render_results(df, origem, copy):
 
 if "auth_user" not in st.session_state:
     st.session_state["auth_user"] = None
+if "lot_view_mode" not in st.session_state:
+    st.session_state["lot_view_mode"] = "Lista de lotes"
 
 if not st.session_state["auth_user"]:
     render_login_cover()
@@ -3421,6 +3423,14 @@ if allowed_view_lots:
                 "Valor em alerta": st.column_config.TextColumn("Valor em alerta", width="medium"),
             },
         )
+        lot_view_mode = st.segmented_control(
+            "Visão dos lotes",
+            options=["Lista de lotes", "Detalhe do lote"],
+            default=st.session_state.get("lot_view_mode", "Lista de lotes"),
+            selection_mode="single",
+            key="lot_view_segmented",
+        )
+        st.session_state["lot_view_mode"] = lot_view_mode
         st.caption("Selecione um lote para abrir o detalhe, acompanhar seus indicadores e, quando autorizado, editar ou excluir.")
 
         opcoes_lote = {
@@ -3451,10 +3461,12 @@ if allowed_view_lots:
             if st.button("Abrir lote", use_container_width=True):
                 st.session_state["opened_batch_ref"] = lote_ref
                 st.session_state["editing_batch_ref"] = None
+                st.session_state["lot_view_mode"] = "Detalhe do lote"
         with a2:
             editar_lote = st.button("Editar lote", use_container_width=True, disabled=not allowed_edit_lots)
             if editar_lote and allowed_edit_lots:
                 st.session_state["editing_batch_ref"] = lote_ref
+                st.session_state["lot_view_mode"] = "Detalhe do lote"
         with a3:
             excluir_lote = st.button("Excluir lote", use_container_width=True, type="secondary", disabled=not allowed_delete_lots)
             if excluir_lote and allowed_delete_lots:
@@ -3506,7 +3518,7 @@ if allowed_view_lots:
                     st.session_state["editing_batch_ref"] = None
                     st.rerun()
 
-        if st.session_state.get("opened_batch_ref") == lote_ref:
+        if st.session_state.get("opened_batch_ref") == lote_ref and st.session_state.get("lot_view_mode") == "Detalhe do lote":
             docs_lote = load_batch_documents(lote_ref)
             st.markdown("#### Detalhe do lote")
             d1, d2, d3, d4 = st.columns(4)
@@ -3614,6 +3626,7 @@ if allowed_view_lots:
                     if st.button("Fechar lote", key=f"close_batch_{lote_ref}", use_container_width=True):
                         st.session_state["opened_batch_ref"] = None
                         st.session_state["editing_batch_ref"] = None
+                        st.session_state["lot_view_mode"] = "Lista de lotes"
                         st.success("Detalhe do lote fechado.")
                         st.rerun()
 else:
