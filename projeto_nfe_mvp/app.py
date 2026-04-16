@@ -2615,16 +2615,13 @@ def resolver_periodo_lotes(filtro_periodo, data_inicial=None, data_final=None):
 
 
 def resumo_tratativa_lote(docs_lote):
-    resumo = []
+    resumo = {}
     for status in CASE_STATUS_OPTIONS:
         base = docs_lote[docs_lote["case_status"] == status]
-        resumo.append(
-            {
-                "status": status,
-                "quantidade": int(len(base)),
-                "valor": float(base["valor_nf_num"].fillna(0).sum()) if not base.empty else 0.0,
-            }
-        )
+        resumo[status] = {
+            "quantidade": int(len(base)),
+            "valor": float(base["valor_nf_num"].fillna(0).sum()) if not base.empty else 0.0,
+        }
     return resumo
 
 
@@ -3363,10 +3360,10 @@ if allowed_view_lots:
                 st.markdown("#### Painel de tratativa")
                 resumo_tratativa = resumo_tratativa_lote(docs_lote)
                 rt1, rt2, rt3, rt4 = st.columns(4)
-                render_batch_metric(rt1, "Novos", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Novo"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Novo")))
-                render_batch_metric(rt2, "Em análise", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Em análise"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Em análise")))
-                render_batch_metric(rt3, "Confirmados", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Confirmado"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Confirmado")))
-                render_batch_metric(rt4, "Descartados", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Descartado"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Descartado")))
+                render_batch_metric(rt1, "Novos", resumo_tratativa["Novo"]["quantidade"], formatar_brl(resumo_tratativa["Novo"]["valor"]))
+                render_batch_metric(rt2, "Em análise", resumo_tratativa["Em análise"]["quantidade"], formatar_brl(resumo_tratativa["Em análise"]["valor"]))
+                render_batch_metric(rt3, "Confirmados", resumo_tratativa["Confirmado"]["quantidade"], formatar_brl(resumo_tratativa["Confirmado"]["valor"]))
+                render_batch_metric(rt4, "Descartados", resumo_tratativa["Descartado"]["quantidade"], formatar_brl(resumo_tratativa["Descartado"]["valor"]))
 
                 csv_lote = docs_lote.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
