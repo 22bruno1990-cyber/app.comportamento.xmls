@@ -2614,6 +2614,20 @@ def resolver_periodo_lotes(filtro_periodo, data_inicial=None, data_final=None):
     return None, None
 
 
+def resumo_tratativa_lote(docs_lote):
+    resumo = []
+    for status in CASE_STATUS_OPTIONS:
+        base = docs_lote[docs_lote["case_status"] == status]
+        resumo.append(
+            {
+                "status": status,
+                "quantidade": int(len(base)),
+                "valor": float(base["valor_nf_num"].fillna(0).sum()) if not base.empty else 0.0,
+            }
+        )
+    return resumo
+
+
 def categoria_trilha_risco(classificacao):
     if classificacao == "REAPRESENTACAO":
         return "FRAUDE FORTE"
@@ -3346,6 +3360,14 @@ if allowed_view_lots:
             if docs_lote.empty:
                 st.caption("Nenhum documento encontrado para este lote.")
             else:
+                st.markdown("#### Painel de tratativa")
+                resumo_tratativa = resumo_tratativa_lote(docs_lote)
+                rt1, rt2, rt3, rt4 = st.columns(4)
+                render_batch_metric(rt1, "Novos", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Novo"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Novo")))
+                render_batch_metric(rt2, "Em análise", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Em análise"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Em análise")))
+                render_batch_metric(rt3, "Confirmados", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Confirmado"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Confirmado")))
+                render_batch_metric(rt4, "Descartados", next(item["quantidade"] for item in resumo_tratativa if item["status"] == "Descartado"), formatar_brl(next(item["valor"] for item in resumo_tratativa if item["status"] == "Descartado")))
+
                 csv_lote = docs_lote.to_csv(index=False).encode("utf-8-sig")
                 st.download_button(
                     "Exportar CSV do lote",
@@ -3354,46 +3376,59 @@ if allowed_view_lots:
                     mime="text/csv",
                     use_container_width=False,
                 )
+                filtro_case_status = st.selectbox(
+                    "Filtrar casos do lote por status",
+                    ["Todos"] + CASE_STATUS_OPTIONS,
+                    index=0,
+                    help="Filtre a tabela do lote pelo andamento da tratativa analítica.",
+                    key=f"case_filter_{lote_ref}",
+                )
+                docs_lote_exibicao = docs_lote.copy()
+                if filtro_case_status != "Todos":
+                    docs_lote_exibicao = docs_lote_exibicao[docs_lote_exibicao["case_status"] == filtro_case_status].copy()
                 if allowed_review_cases:
                     st.markdown("#### Tratativa do caso")
                     opcoes_caso = {
                         f'{row["arquivo"]} · {row["classificacao_final"]} · {row["valor_nf"]}': int(row["id"])
-                        for _, row in docs_lote.iterrows()
+                        for _, row in docs_lote_exibicao.iterrows()
                     }
-                    caso_label = st.selectbox(
-                        "Selecionar caso do lote",
-                        list(opcoes_caso.keys()),
-                        help="Escolha um documento do lote para registrar o andamento da análise.",
-                    )
-                    caso_id = opcoes_caso[caso_label]
-                    caso_atual = docs_lote[docs_lote["id"] == caso_id].iloc[0]
-                    review_col1, review_col2 = st.columns([1, 2])
-                    with review_col1:
-                        novo_case_status = st.selectbox(
-                            "Status do caso",
-                            CASE_STATUS_OPTIONS,
-                            index=CASE_STATUS_OPTIONS.index(caso_atual["case_status"]) if caso_atual["case_status"] in CASE_STATUS_OPTIONS else 0,
-                            key=f"case_status_{caso_id}",
+                    if opcoes_caso:
+                        caso_label = st.selectbox(
+                            "Selecionar caso do lote",
+                            list(opcoes_caso.keys()),
+                            help="Escolha um documento do lote para registrar o andamento da análise.",
                         )
-                    with review_col2:
-                        nova_case_note = st.text_area(
-                            "Observação do analista",
-                            value=caso_atual["analyst_note"] or "",
-                            key=f"case_note_{caso_id}",
-                            height=90,
-                        )
-                    if st.button("Salvar tratativa", key=f"save_case_{caso_id}", use_container_width=False):
-                        update_case_review(caso_id, novo_case_status, nova_case_note, auth_user["username"])
-                        st.success("Tratativa do caso atualizada.")
-                        st.rerun()
-                    if (caso_atual.get("reviewed_by") or "").strip():
-                        st.caption(
-                            f'Última revisão: {caso_atual["reviewed_by"]} em {caso_atual["reviewed_at"] or "data não registrada"}'
-                        )
+                        caso_id = opcoes_caso[caso_label]
+                        caso_atual = docs_lote_exibicao[docs_lote_exibicao["id"] == caso_id].iloc[0]
+                        review_col1, review_col2 = st.columns([1, 2])
+                        with review_col1:
+                            novo_case_status = st.selectbox(
+                                "Status do caso",
+                                CASE_STATUS_OPTIONS,
+                                index=CASE_STATUS_OPTIONS.index(caso_atual["case_status"]) if caso_atual["case_status"] in CASE_STATUS_OPTIONS else 0,
+                                key=f"case_status_{caso_id}",
+                            )
+                        with review_col2:
+                            nova_case_note = st.text_area(
+                                "Observação do analista",
+                                value=caso_atual["analyst_note"] or "",
+                                key=f"case_note_{caso_id}",
+                                height=90,
+                            )
+                        if st.button("Salvar tratativa", key=f"save_case_{caso_id}", use_container_width=False):
+                            update_case_review(caso_id, novo_case_status, nova_case_note, auth_user["username"])
+                            st.success("Tratativa do caso atualizada.")
+                            st.rerun()
+                        if (caso_atual.get("reviewed_by") or "").strip():
+                            st.caption(
+                                f'Última revisão: {caso_atual["reviewed_by"]} em {caso_atual["reviewed_at"] or "data não registrada"}'
+                            )
+                    else:
+                        st.caption("Nenhum caso encontrado para o status filtrado.")
                 else:
                     st.caption("O perfil atual pode consultar os casos do lote, mas a tratativa analítica fica disponível para perfis Gerencial e Master.")
                 st.dataframe(
-                    docs_lote[
+                    docs_lote_exibicao[
                         [
                             "arquivo",
                             "paciente",
