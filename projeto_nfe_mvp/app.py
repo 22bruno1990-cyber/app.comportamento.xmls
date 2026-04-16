@@ -1086,6 +1086,73 @@ def load_batch_history(limit=12):
             normalizados.append(row)
         else:
             normalizados.append(dict(row))
+    lotes_df = pd.DataFrame(normalizados)
+    if lotes_df.empty:
+        return lotes_df
+
+    valor_total = []
+    valor_alerta = []
+    with get_db_connection() as conn:
+        for batch_ref in lotes_df["batch_ref"]:
+            like_ref = f"%batch_ref={batch_ref}%"
+            valor_total.append(
+                float(
+                    query_scalar(
+                        conn,
+                        "SELECT COALESCE(SUM(valor_nf_num), 0) FROM nfe_documents WHERE origem_upload LIKE ?",
+                        (like_ref,),
+                    )
+                )
+            )
+            valor_alerta.append(
+                float(
+                    query_scalar(
+                        conn,
+                        """
+                        SELECT COALESCE(SUM(valor_nf_num), 0)
+                        FROM nfe_documents
+                        WHERE origem_upload LIKE ?
+                          AND score_final >= 60
+                        """,
+                        (like_ref,),
+                    )
+                )
+            )
+    lotes_df["valor_total"] = valor_total
+    lotes_df["valor_alerta"] = valor_alerta
+    return lotes_df
+
+
+def load_batch_documents(batch_ref):
+    inicializar_banco()
+    with get_db_connection() as conn:
+        rows = db_fetchall(
+            conn,
+            """
+            SELECT
+                arquivo,
+                paciente,
+                prestador,
+                procedimento,
+                valor_nf,
+                valor_nf_num,
+                score_final,
+                classificacao_final,
+                motivo_tecnico,
+                motivo_comportamental,
+                analisado_em
+            FROM nfe_documents
+            WHERE origem_upload LIKE ?
+            ORDER BY score_final DESC, valor_nf_num DESC, analisado_em DESC
+            """,
+            (f"%batch_ref={batch_ref}%",),
+        )
+    normalizados = []
+    for row in rows:
+        if isinstance(row, dict):
+            normalizados.append(row)
+        else:
+            normalizados.append(dict(row))
     return pd.DataFrame(normalizados)
 
 
@@ -2775,7 +2842,49 @@ lotes_df = load_batch_history()
 if lotes_df.empty:
     st.caption("Nenhum lote registrado ainda.")
 else:
-    st.dataframe(lotes_df, use_container_width=True, hide_index=True)
+    lotes_exibicao = lotes_df.copy()
+    lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
+    lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
+    st.dataframe(lotes_exibicao, use_container_width=True, hide_index=True)
+
+    opcoes_lote = {
+        f'{row["batch_name"]} · {row["created_at"]} · {row["total_documentos"]} XMLs': row["batch_ref"]
+        for _, row in lotes_df.iterrows()
+    }
+    lote_label = st.selectbox("Selecionar lote", list(opcoes_lote.keys()))
+    lote_ref = opcoes_lote[lote_label]
+    lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
+    docs_lote = load_batch_documents(lote_ref)
+
+    st.markdown("#### Detalhe do lote")
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("XMLs", int(lote_atual["total_documentos"]))
+    d2.metric("Alertas", int(lote_atual["total_alertas"]))
+    d3.metric("Valor total", formatar_brl(float(lote_atual["valor_total"])))
+    d4.metric("Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
+    st.caption(
+        f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Referência: {lote_ref}'
+    )
+    if docs_lote.empty:
+        st.caption("Nenhum documento encontrado para este lote.")
+    else:
+        st.dataframe(
+            docs_lote[
+                [
+                    "arquivo",
+                    "paciente",
+                    "prestador",
+                    "procedimento",
+                    "valor_nf",
+                    "score_final",
+                    "classificacao_final",
+                    "motivo_tecnico",
+                    "motivo_comportamental",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 uploaded_files = st.file_uploader(
     copy["upload_label"],
