@@ -763,6 +763,14 @@ ROLE_DEFINITIONS = {
     },
 }
 
+BATCH_STATUS_OPTIONS = [
+    "Novo",
+    "Em análise",
+    "Priorizado",
+    "Concluído",
+    "Arquivado",
+]
+
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
@@ -921,6 +929,22 @@ def get_bootstrap_users():
     return deduped
 
 
+def ensure_upload_batches_schema(conn):
+    if is_postgres():
+        db_execute(conn, "ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Novo'")
+        db_execute(conn, "ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''")
+        return
+
+    existing_columns = {
+        row["name"] if isinstance(row, sqlite3.Row) else row[1]
+        for row in conn.execute("PRAGMA table_info(upload_batches)").fetchall()
+    }
+    if "status" not in existing_columns:
+        conn.execute("ALTER TABLE upload_batches ADD COLUMN status TEXT DEFAULT 'Novo'")
+    if "notes" not in existing_columns:
+        conn.execute("ALTER TABLE upload_batches ADD COLUMN notes TEXT DEFAULT ''")
+
+
 def inicializar_banco():
     with get_db_connection() as conn:
         if is_postgres():
@@ -1029,6 +1053,8 @@ def inicializar_banco():
                     origem_upload TEXT,
                     segment TEXT,
                     uploaded_by TEXT,
+                    status TEXT DEFAULT 'Novo',
+                    notes TEXT DEFAULT '',
                     total_documentos INTEGER,
                     total_alertas INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1059,12 +1085,15 @@ def inicializar_banco():
                     origem_upload TEXT,
                     segment TEXT,
                     uploaded_by TEXT,
+                    status TEXT DEFAULT 'Novo',
+                    notes TEXT DEFAULT '',
                     total_documentos INTEGER,
                     total_alertas INTEGER,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
                 """,
             )
+        ensure_upload_batches_schema(conn)
         conn.commit()
     bootstrap_admin_user()
 
@@ -1172,9 +1201,9 @@ def registrar_lote_upload(df, origem_upload, segment, uploaded_by):
             conn,
             """
             INSERT INTO upload_batches (
-                batch_ref, batch_name, origem_upload, segment, uploaded_by, total_documentos, total_alertas
+                batch_ref, batch_name, origem_upload, segment, uploaded_by, status, notes, total_documentos, total_alertas
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 batch_ref,
@@ -1182,6 +1211,8 @@ def registrar_lote_upload(df, origem_upload, segment, uploaded_by):
                 origem_upload,
                 segment,
                 uploaded_by,
+                "Novo",
+                "",
                 int(len(df)),
                 total_alertas,
             ),
@@ -1206,7 +1237,7 @@ def load_batch_history(limit=None, start_date=None, end_date=None):
         rows = db_fetchall(
             conn,
             f"""
-            SELECT batch_ref, batch_name, segment, uploaded_by, total_documentos, total_alertas, created_at
+            SELECT batch_ref, batch_name, segment, uploaded_by, status, notes, total_documentos, total_alertas, created_at
             FROM upload_batches
             {where_clause}
             ORDER BY created_at DESC
@@ -1292,13 +1323,13 @@ def load_batch_documents(batch_ref):
     return df
 
 
-def update_batch_name(batch_ref, new_name):
+def update_batch_metadata(batch_ref, new_name, status, notes):
     inicializar_banco()
     with get_db_connection() as conn:
         db_execute(
             conn,
-            "UPDATE upload_batches SET batch_name = ? WHERE batch_ref = ?",
-            (new_name.strip(), batch_ref),
+            "UPDATE upload_batches SET batch_name = ?, status = ?, notes = ? WHERE batch_ref = ?",
+            ((new_name or "").strip(), status, (notes or "").strip(), batch_ref),
         )
         conn.commit()
 
@@ -3061,7 +3092,13 @@ render_hero(copy)
 render_pitch(copy)
 if allowed_view_lots:
     st.markdown("### Histórico de lotes")
-    filtro_col1, filtro_col2, filtro_col3 = st.columns([1.4, 1, 1])
+    lotes_base = load_batch_history(limit=None)
+    usuarios_lotes = (
+        sorted(lotes_base["uploaded_by"].dropna().astype(str).unique().tolist())
+        if not lotes_base.empty and "uploaded_by" in lotes_base.columns
+        else []
+    )
+    filtro_col1, filtro_col2, filtro_col3, filtro_col4 = st.columns([1.2, 1, 1, 1])
     with filtro_col1:
         filtro_periodo = st.selectbox(
             "Período dos lotes",
@@ -3076,6 +3113,13 @@ if allowed_view_lots:
             ],
             index=0,
             help="Filtre o histórico por janela de tempo para localizar os lotes enviados.",
+        )
+    with filtro_col4:
+        filtro_usuario = st.selectbox(
+            "Responsável",
+            ["Todos"] + usuarios_lotes,
+            index=0,
+            help="Filtre os lotes pelo usuário responsável pelo envio.",
         )
     data_inicial = None
     data_final = None
@@ -3092,21 +3136,30 @@ if allowed_view_lots:
                 value=date.today(),
                 format="DD/MM/YYYY",
             )
+        if data_inicial and data_final and data_inicial > data_final:
+            data_inicial, data_final = data_final, data_inicial
     start_date, end_date = resolver_periodo_lotes(filtro_periodo, data_inicial, data_final)
     limite_lotes = 12 if filtro_periodo == "Últimos lançamentos" else None
     lotes_df = load_batch_history(limit=limite_lotes, start_date=start_date, end_date=end_date)
+    if filtro_usuario != "Todos" and not lotes_df.empty:
+        lotes_df = lotes_df[lotes_df["uploaded_by"] == filtro_usuario].copy()
     if lotes_df.empty:
         st.caption("Nenhum lote encontrado para o período selecionado.")
     else:
         lotes_exibicao = lotes_df.copy()
         lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
         lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
+        lotes_exibicao["notes_preview"] = lotes_exibicao["notes"].fillna("").apply(
+            lambda valor: (valor[:60] + "...") if len(valor) > 60 else (valor or "Sem observação")
+        )
         lotes_exibicao = lotes_exibicao.rename(
             columns={
                 "batch_ref": "referencia_lote",
                 "batch_name": "nome_lote",
                 "segment": "segmento",
                 "uploaded_by": "enviado_por",
+                "status": "status",
+                "notes_preview": "observacao",
                 "total_documentos": "xmls",
                 "total_alertas": "alertas",
                 "created_at": "processado_em",
@@ -3165,7 +3218,7 @@ if allowed_view_lots:
 
         if st.session_state.get("editing_batch_ref") == lote_ref and allowed_edit_lots:
             st.markdown("#### Editar lote")
-            edit_col1, edit_col2 = st.columns([2, 1])
+            edit_col1, edit_col2 = st.columns([1.2, 1])
             with edit_col1:
                 novo_nome = st.text_input(
                     "Novo nome do lote",
@@ -3173,11 +3226,30 @@ if allowed_view_lots:
                     key=f"rename_{lote_ref}",
                 )
             with edit_col2:
-                st.write("")
+                novo_status = st.selectbox(
+                    "Status do lote",
+                    BATCH_STATUS_OPTIONS,
+                    index=BATCH_STATUS_OPTIONS.index(lote_atual["status"]) if lote_atual["status"] in BATCH_STATUS_OPTIONS else 0,
+                    key=f"status_{lote_ref}",
+                )
+            nova_observacao = st.text_area(
+                "Observação do lote",
+                value=lote_atual["notes"] or "",
+                key=f"notes_{lote_ref}",
+                help="Registre contexto operacional, achados ou orientação para o acompanhamento desse lote.",
+                height=100,
+            )
+            salvar_col, spacer_col = st.columns([1, 2])
+            with salvar_col:
                 st.write("")
                 if st.button("Salvar lote", use_container_width=True):
-                    update_batch_name(lote_ref, novo_nome or lote_atual["batch_name"])
-                    st.success("Nome do lote atualizado.")
+                    update_batch_metadata(
+                        lote_ref,
+                        novo_nome or lote_atual["batch_name"],
+                        novo_status,
+                        nova_observacao,
+                    )
+                    st.success("Lote atualizado.")
                     st.session_state["editing_batch_ref"] = None
                     st.rerun()
 
@@ -3190,8 +3262,10 @@ if allowed_view_lots:
             render_batch_metric(d3, "Valor total", formatar_brl(float(lote_atual["valor_total"])))
             render_batch_metric(d4, "Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
             st.caption(
-                f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Referência: {lote_ref}'
+                f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Status: {lote_atual["status"]} | Referência: {lote_ref}'
             )
+            if (lote_atual.get("notes") or "").strip():
+                st.info(f'Observação do lote: {lote_atual["notes"]}')
             if docs_lote.empty:
                 st.caption("Nenhum documento encontrado para este lote.")
             else:
