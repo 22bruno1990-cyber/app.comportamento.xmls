@@ -2877,6 +2877,8 @@ if lotes_df.empty:
     st.caption("Nenhum lote registrado ainda.")
 else:
     lotes_exibicao = lotes_df.copy()
+    lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
+    lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
     lotes_exibicao = lotes_exibicao.rename(
         columns={
             "batch_ref": "referencia_lote",
@@ -2890,8 +2892,6 @@ else:
             "valor_alerta": "valor_em_alerta",
         }
     )
-    lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
-    lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
     st.dataframe(lotes_exibicao, use_container_width=True, hide_index=True)
     st.caption("Selecione um lote para abrir o detalhe, renomear a referência de negócio ou excluir o histórico desse envio.")
 
