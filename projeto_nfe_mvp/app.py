@@ -3535,29 +3535,24 @@ if allowed_view_lots:
             if docs_lote.empty:
                 st.caption("Nenhum documento encontrado para este lote.")
             else:
-                st.markdown("#### Painel de tratativa")
-                resumo_tratativa = resumo_tratativa_lote(docs_lote)
-                rt1, rt2, rt3, rt4 = st.columns(4)
-                render_batch_metric(rt1, "Novos", resumo_tratativa["Novo"]["quantidade"], formatar_brl(resumo_tratativa["Novo"]["valor"]))
-                render_batch_metric(rt2, "Em análise", resumo_tratativa["Em análise"]["quantidade"], formatar_brl(resumo_tratativa["Em análise"]["valor"]))
-                render_batch_metric(rt3, "Confirmados", resumo_tratativa["Confirmado"]["quantidade"], formatar_brl(resumo_tratativa["Confirmado"]["valor"]))
-                render_batch_metric(rt4, "Descartados", resumo_tratativa["Descartado"]["quantidade"], formatar_brl(resumo_tratativa["Descartado"]["valor"]))
-
                 csv_lote = docs_lote.to_csv(index=False).encode("utf-8-sig")
-                st.download_button(
-                    "Exportar CSV do lote",
-                    data=csv_lote,
-                    file_name=f"{lote_atual['batch_name']}_detalhe_lote.csv".replace(" ", "_"),
-                    mime="text/csv",
-                    use_container_width=False,
-                )
-                filtro_case_status = st.selectbox(
-                    "Filtrar casos do lote por status",
-                    ["Todos"] + CASE_STATUS_OPTIONS,
-                    index=0,
-                    help="Filtre a tabela do lote pelo andamento da tratativa analítica.",
-                    key=f"case_filter_{lote_ref}",
-                )
+                acao_col1, acao_col2 = st.columns([1, 1.2])
+                with acao_col1:
+                    st.download_button(
+                        "Exportar CSV do lote",
+                        data=csv_lote,
+                        file_name=f"{lote_atual['batch_name']}_detalhe_lote.csv".replace(" ", "_"),
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                with acao_col2:
+                    filtro_case_status = st.selectbox(
+                        "Filtrar casos do lote por status",
+                        ["Todos"] + CASE_STATUS_OPTIONS,
+                        index=0,
+                        help="Filtre a tabela do lote pelo andamento da tratativa analítica.",
+                        key=f"case_filter_{lote_ref}",
+                    )
                 docs_lote_exibicao = docs_lote.copy()
                 if filtro_case_status != "Todos":
                     docs_lote_exibicao = docs_lote_exibicao[docs_lote_exibicao["case_status"] == filtro_case_status].copy()
