@@ -544,10 +544,14 @@ st.markdown(
     .login-stage .stRadio [role="radiogroup"] {
         justify-content: center !important;
         gap: 1.4rem !important;
+        flex-wrap: nowrap !important;
+        white-space: nowrap !important;
     }
 
     .login-stage .stRadio label {
         justify-content: center !important;
+        white-space: nowrap !important;
+        margin-bottom: 0 !important;
     }
 
     .login-access-title {
