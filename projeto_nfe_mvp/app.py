@@ -2912,24 +2912,44 @@ else:
     lote_ref = opcoes_lote[lote_label]
     st.session_state["selected_batch_ref"] = lote_ref
     lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
+    if "editing_batch_ref" not in st.session_state:
+        st.session_state["editing_batch_ref"] = None
 
-    a1, a2, a3 = st.columns([1, 1, 1.4])
+    a1, a2, a3 = st.columns(3)
     with a1:
         if st.button("Abrir lote", use_container_width=True):
             st.session_state["opened_batch_ref"] = lote_ref
+            st.session_state["editing_batch_ref"] = None
     with a2:
-        novo_nome = st.text_input("Editar nome do lote", value=lote_atual["batch_name"], key=f"rename_{lote_ref}")
-        if st.button("Salvar nome", use_container_width=True):
-            update_batch_name(lote_ref, novo_nome or lote_atual["batch_name"])
-            st.success("Nome do lote atualizado.")
-            st.rerun()
+        if st.button("Editar lote", use_container_width=True):
+            st.session_state["editing_batch_ref"] = lote_ref
     with a3:
         if st.button("Excluir lote", use_container_width=True, type="secondary"):
             delete_batch(lote_ref)
             st.success("Lote excluído do histórico.")
             if st.session_state.get("opened_batch_ref") == lote_ref:
                 st.session_state["opened_batch_ref"] = None
+            if st.session_state.get("editing_batch_ref") == lote_ref:
+                st.session_state["editing_batch_ref"] = None
             st.rerun()
+
+    if st.session_state.get("editing_batch_ref") == lote_ref:
+        st.markdown("#### Editar lote")
+        edit_col1, edit_col2 = st.columns([2, 1])
+        with edit_col1:
+            novo_nome = st.text_input(
+                "Novo nome do lote",
+                value=lote_atual["batch_name"],
+                key=f"rename_{lote_ref}",
+            )
+        with edit_col2:
+            st.write("")
+            st.write("")
+            if st.button("Salvar lote", use_container_width=True):
+                update_batch_name(lote_ref, novo_nome or lote_atual["batch_name"])
+                st.success("Nome do lote atualizado.")
+                st.session_state["editing_batch_ref"] = None
+                st.rerun()
 
     if st.session_state.get("opened_batch_ref") == lote_ref:
         docs_lote = load_batch_documents(lote_ref)
