@@ -1402,12 +1402,18 @@ def delete_batch(batch_ref):
         conn.commit()
 
 
-def render_batch_metric(col, label, value):
+def render_batch_metric(col, label, value, sub=None):
+    extra = (
+        f'<div style="font-size:0.92rem; font-weight:700; color:#5b6d84; margin-top:10px; white-space:nowrap;">{sub}</div>'
+        if sub is not None
+        else ""
+    )
     col.markdown(
         f"""
         <div class="glass-card" style="padding:16px 18px; min-height:120px;">
             <div class="section-title" style="font-size:0.95rem; margin-bottom:10px;">{label}</div>
-            <div style="font-size:2rem; font-weight:800; color:#152b4c;">{value}</div>
+            <div style="font-size:2rem; font-weight:800; color:#152b4c; white-space:nowrap;">{value}</div>
+            {extra}
         </div>
         """,
         unsafe_allow_html=True,
