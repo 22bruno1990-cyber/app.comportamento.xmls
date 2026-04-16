@@ -1158,6 +1158,38 @@ def load_batch_documents(batch_ref):
     return df
 
 
+def update_batch_name(batch_ref, new_name):
+    inicializar_banco()
+    with get_db_connection() as conn:
+        db_execute(
+            conn,
+            "UPDATE upload_batches SET batch_name = ? WHERE batch_ref = ?",
+            (new_name.strip(), batch_ref),
+        )
+        conn.commit()
+
+
+def delete_batch(batch_ref):
+    inicializar_banco()
+    like_ref = f"%batch_ref={batch_ref}%"
+    with get_db_connection() as conn:
+        db_execute(conn, "DELETE FROM nfe_documents WHERE origem_upload LIKE ?", (like_ref,))
+        db_execute(conn, "DELETE FROM upload_batches WHERE batch_ref = ?", (batch_ref,))
+        conn.commit()
+
+
+def render_batch_metric(col, label, value):
+    col.markdown(
+        f"""
+        <div class="glass-card" style="padding:16px 18px; min-height:120px;">
+            <div class="section-title" style="font-size:0.95rem; margin-bottom:10px;">{label}</div>
+            <div style="font-size:2rem; font-weight:800; color:#152b4c;">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_login_cover():
     logo_base64 = image_to_base64(LOGIN_LOGO_PATH)
     st.markdown(
@@ -2845,48 +2877,91 @@ if lotes_df.empty:
     st.caption("Nenhum lote registrado ainda.")
 else:
     lotes_exibicao = lotes_df.copy()
+    lotes_exibicao = lotes_exibicao.rename(
+        columns={
+            "batch_ref": "referencia_lote",
+            "batch_name": "nome_lote",
+            "segment": "segmento",
+            "uploaded_by": "enviado_por",
+            "total_documentos": "xmls",
+            "total_alertas": "alertas",
+            "created_at": "processado_em",
+            "valor_total": "valor_total",
+            "valor_alerta": "valor_em_alerta",
+        }
+    )
     lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
     lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
     st.dataframe(lotes_exibicao, use_container_width=True, hide_index=True)
+    st.caption("Selecione um lote para abrir o detalhe, renomear a referência de negócio ou excluir o histórico desse envio.")
 
     opcoes_lote = {
         f'{row["batch_name"]} · {row["created_at"]} · {row["total_documentos"]} XMLs': row["batch_ref"]
         for _, row in lotes_df.iterrows()
     }
-    lote_label = st.selectbox("Selecionar lote", list(opcoes_lote.keys()))
-    lote_ref = opcoes_lote[lote_label]
-    lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
-    docs_lote = load_batch_documents(lote_ref)
+    if "selected_batch_ref" not in st.session_state and opcoes_lote:
+        st.session_state["selected_batch_ref"] = next(iter(opcoes_lote.values()))
 
-    st.markdown("#### Detalhe do lote")
-    d1, d2, d3, d4 = st.columns(4)
-    d1.metric("XMLs", int(lote_atual["total_documentos"]))
-    d2.metric("Alertas", int(lote_atual["total_alertas"]))
-    d3.metric("Valor total", formatar_brl(float(lote_atual["valor_total"])))
-    d4.metric("Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
-    st.caption(
-        f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Referência: {lote_ref}'
+    lote_label = st.selectbox(
+        "Selecionar lote",
+        list(opcoes_lote.keys()),
+        index=list(opcoes_lote.values()).index(st.session_state["selected_batch_ref"])
+        if st.session_state["selected_batch_ref"] in opcoes_lote.values()
+        else 0,
     )
-    if docs_lote.empty:
-        st.caption("Nenhum documento encontrado para este lote.")
-    else:
-        st.dataframe(
-            docs_lote[
-                [
-                    "arquivo",
-                    "paciente",
-                    "prestador",
-                    "procedimento",
-                    "valor_nf",
-                    "score_final",
-                    "classificacao_final",
-                    "motivo_tecnico",
-                    "motivo_comportamental",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
+    lote_ref = opcoes_lote[lote_label]
+    st.session_state["selected_batch_ref"] = lote_ref
+    lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
+
+    a1, a2, a3 = st.columns([1, 1, 1.4])
+    with a1:
+        if st.button("Abrir lote", use_container_width=True):
+            st.session_state["opened_batch_ref"] = lote_ref
+    with a2:
+        novo_nome = st.text_input("Editar nome do lote", value=lote_atual["batch_name"], key=f"rename_{lote_ref}")
+        if st.button("Salvar nome", use_container_width=True):
+            update_batch_name(lote_ref, novo_nome or lote_atual["batch_name"])
+            st.success("Nome do lote atualizado.")
+            st.rerun()
+    with a3:
+        if st.button("Excluir lote", use_container_width=True, type="secondary"):
+            delete_batch(lote_ref)
+            st.success("Lote excluído do histórico.")
+            if st.session_state.get("opened_batch_ref") == lote_ref:
+                st.session_state["opened_batch_ref"] = None
+            st.rerun()
+
+    if st.session_state.get("opened_batch_ref") == lote_ref:
+        docs_lote = load_batch_documents(lote_ref)
+        st.markdown("#### Detalhe do lote")
+        d1, d2, d3, d4 = st.columns(4)
+        render_batch_metric(d1, "XMLs", int(lote_atual["total_documentos"]))
+        render_batch_metric(d2, "Alertas", int(lote_atual["total_alertas"]))
+        render_batch_metric(d3, "Valor total", formatar_brl(float(lote_atual["valor_total"])))
+        render_batch_metric(d4, "Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
+        st.caption(
+            f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Referência: {lote_ref}'
         )
+        if docs_lote.empty:
+            st.caption("Nenhum documento encontrado para este lote.")
+        else:
+            st.dataframe(
+                docs_lote[
+                    [
+                        "arquivo",
+                        "paciente",
+                        "prestador",
+                        "procedimento",
+                        "valor_nf",
+                        "score_final",
+                        "classificacao_final",
+                        "motivo_tecnico",
+                        "motivo_comportamental",
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
 uploaded_files = st.file_uploader(
     copy["upload_label"],
