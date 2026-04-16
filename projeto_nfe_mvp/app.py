@@ -3154,20 +3154,37 @@ if allowed_view_lots:
         )
         lotes_exibicao = lotes_exibicao.rename(
             columns={
-                "batch_ref": "referencia_lote",
-                "batch_name": "nome_lote",
-                "segment": "segmento",
-                "uploaded_by": "enviado_por",
-                "status": "status",
-                "notes_preview": "observacao",
-                "total_documentos": "xmls",
-                "total_alertas": "alertas",
-                "created_at": "processado_em",
-                "valor_total": "valor_total",
-                "valor_alerta": "valor_em_alerta",
+                "batch_ref": "Referência do lote",
+                "batch_name": "Nome do lote",
+                "segment": "Segmento",
+                "uploaded_by": "Enviado por",
+                "status": "Status",
+                "notes_preview": "Observação",
+                "total_documentos": "XMLs",
+                "total_alertas": "Alertas",
+                "created_at": "Processado em",
+                "valor_total": "Valor total",
+                "valor_alerta": "Valor em alerta",
             }
         )
-        st.dataframe(lotes_exibicao, use_container_width=True, hide_index=True)
+        st.dataframe(
+            lotes_exibicao,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Referência do lote": st.column_config.TextColumn("Referência do lote", width="large"),
+                "Nome do lote": st.column_config.TextColumn("Nome do lote", width="medium"),
+                "Segmento": st.column_config.TextColumn("Segmento", width="small"),
+                "Enviado por": st.column_config.TextColumn("Enviado por", width="medium"),
+                "Status": st.column_config.TextColumn("Status", width="medium"),
+                "Observação": st.column_config.TextColumn("Observação", width="large"),
+                "XMLs": st.column_config.NumberColumn("XMLs", width="small", format="%d"),
+                "Alertas": st.column_config.NumberColumn("Alertas", width="small", format="%d"),
+                "Processado em": st.column_config.TextColumn("Processado em", width="large"),
+                "Valor total": st.column_config.TextColumn("Valor total", width="medium"),
+                "Valor em alerta": st.column_config.TextColumn("Valor em alerta", width="medium"),
+            },
+        )
         st.caption("Selecione um lote para abrir o detalhe, acompanhar seus indicadores e, quando autorizado, editar ou excluir.")
 
         opcoes_lote = {
