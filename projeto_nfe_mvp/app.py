@@ -537,23 +537,6 @@ st.markdown(
         margin-bottom: 0.35rem !important;
     }
 
-    .login-stage .stRadio > div {
-        align-items: center !important;
-    }
-
-    .login-stage .stRadio [role="radiogroup"] {
-        justify-content: center !important;
-        gap: 1.4rem !important;
-        flex-wrap: nowrap !important;
-        white-space: nowrap !important;
-    }
-
-    .login-stage .stRadio label {
-        justify-content: center !important;
-        white-space: nowrap !important;
-        margin-bottom: 0 !important;
-    }
-
     .login-access-title {
         text-align: center;
         color: #eef5ff;
@@ -561,6 +544,27 @@ st.markdown(
         font-weight: 800;
         letter-spacing: 0.01em;
         margin-bottom: 0.4rem;
+    }
+
+    .login-access-row {
+        margin: 0.2rem auto 0.35rem auto;
+        max-width: 34rem;
+    }
+
+    .login-access-row .stColumn {
+        display: flex;
+        align-items: stretch;
+    }
+
+    .login-access-row .stButton {
+        width: 100%;
+    }
+
+    .login-access-row .stButton > button {
+        min-height: 42px !important;
+        font-size: 0.98rem !important;
+        font-weight: 800 !important;
+        white-space: nowrap !important;
     }
 
     .login-access-copy {
@@ -1345,20 +1349,22 @@ def render_login_cover():
         bootstrap_users = get_bootstrap_users()
         if bootstrap_users:
             available_roles = [role for role in ROLE_DEFINITIONS if any(normalize_role(user["role"]) == role for user in bootstrap_users)]
-            role_options = [ROLE_DEFINITIONS[role]["label"] for role in available_roles]
+            if "cover_access_role" not in st.session_state or st.session_state["cover_access_role"] not in available_roles:
+                st.session_state["cover_access_role"] = available_roles[0]
             st.markdown('<div class="login-access-title">Tipo de acesso</div>', unsafe_allow_html=True)
-            selected_label = st.radio(
-                "Tipo de acesso",
-                role_options,
-                horizontal=True,
-                key="cover_access_label",
-                label_visibility="collapsed",
-            )
-            selected_role = next(
-                role_key
-                for role_key in available_roles
-                if ROLE_DEFINITIONS[role_key]["label"] == selected_label
-            )
+            st.markdown('<div class="login-access-row">', unsafe_allow_html=True)
+            role_cols = st.columns(len(available_roles))
+            for idx, role_key in enumerate(available_roles):
+                with role_cols[idx]:
+                    if st.button(
+                        ROLE_DEFINITIONS[role_key]["label"],
+                        key=f"access_role_{role_key}",
+                        use_container_width=True,
+                        type="primary" if st.session_state["cover_access_role"] == role_key else "secondary",
+                    ):
+                        st.session_state["cover_access_role"] = role_key
+            st.markdown('</div>', unsafe_allow_html=True)
+            selected_role = st.session_state["cover_access_role"]
             st.markdown(
                 f'<div class="login-access-copy">{ROLE_DEFINITIONS[selected_role]["description"]}</div>',
                 unsafe_allow_html=True,
