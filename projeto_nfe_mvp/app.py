@@ -778,6 +778,11 @@ CASE_STATUS_OPTIONS = [
     "Descartado",
 ]
 
+POSTGRES_SCHEMA_READY = {
+    "nfe_documents": False,
+    "upload_batches": False,
+}
+
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
@@ -940,10 +945,30 @@ def get_bootstrap_users():
     return deduped
 
 
+def postgres_existing_columns(conn, table_name):
+    rows = db_fetchall(
+        conn,
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ?
+        """,
+        (table_name,),
+    )
+    return {row["column_name"] for row in rows}
+
+
 def ensure_upload_batches_schema(conn):
     if is_postgres():
-        db_execute(conn, "ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Novo'")
-        db_execute(conn, "ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''")
+        if POSTGRES_SCHEMA_READY["upload_batches"]:
+            return
+        existing_columns = postgres_existing_columns(conn, "upload_batches")
+        if "status" not in existing_columns:
+            db_execute(conn, "ALTER TABLE upload_batches ADD COLUMN status TEXT DEFAULT 'Novo'")
+        if "notes" not in existing_columns:
+            db_execute(conn, "ALTER TABLE upload_batches ADD COLUMN notes TEXT DEFAULT ''")
+        POSTGRES_SCHEMA_READY["upload_batches"] = True
         return
 
     existing_columns = {
@@ -958,10 +983,18 @@ def ensure_upload_batches_schema(conn):
 
 def ensure_nfe_documents_schema(conn):
     if is_postgres():
-        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS case_status TEXT DEFAULT 'Novo'")
-        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS analyst_note TEXT DEFAULT ''")
-        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS reviewed_by TEXT DEFAULT ''")
-        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP NULL")
+        if POSTGRES_SCHEMA_READY["nfe_documents"]:
+            return
+        existing_columns = postgres_existing_columns(conn, "nfe_documents")
+        if "case_status" not in existing_columns:
+            db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN case_status TEXT DEFAULT 'Novo'")
+        if "analyst_note" not in existing_columns:
+            db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN analyst_note TEXT DEFAULT ''")
+        if "reviewed_by" not in existing_columns:
+            db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN reviewed_by TEXT DEFAULT ''")
+        if "reviewed_at" not in existing_columns:
+            db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN reviewed_at TIMESTAMP NULL")
+        POSTGRES_SCHEMA_READY["nfe_documents"] = True
         return
 
     existing_columns = {
