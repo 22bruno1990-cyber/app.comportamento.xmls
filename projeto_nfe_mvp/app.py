@@ -1138,8 +1138,6 @@ def load_batch_documents(batch_ref):
                 valor_nf_num,
                 score_final,
                 classificacao_final,
-                motivo_tecnico,
-                motivo_comportamental,
                 analisado_em
             FROM nfe_documents
             WHERE origem_upload LIKE ?
@@ -1153,7 +1151,11 @@ def load_batch_documents(batch_ref):
             normalizados.append(row)
         else:
             normalizados.append(dict(row))
-    return pd.DataFrame(normalizados)
+    df = pd.DataFrame(normalizados)
+    if not df.empty:
+        df["motivo_tecnico"] = "Disponível no detalhe da análise original"
+        df["motivo_comportamental"] = "Disponível no detalhe da análise original"
+    return df
 
 
 def render_login_cover():
