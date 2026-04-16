@@ -3309,29 +3309,35 @@ if allowed_view_lots:
     start_date, end_date = resolver_periodo_lotes(filtro_periodo, data_inicial, data_final)
     limite_lotes = 12 if filtro_periodo == "Últimos lançamentos" else None
     tratativa_df = load_case_review_dashboard(start_date=start_date, end_date=end_date)
+    area_operacional = st.segmented_control(
+        "Área operacional",
+        options=["Lotes", "Tratativas", "Rankings", "Exportações"],
+        default=st.session_state.get("ops_area_mode", "Lotes"),
+        selection_mode="single",
+        key="ops_area_segmented",
+    )
+    st.session_state["ops_area_mode"] = area_operacional
 
-    st.markdown("#### Visão gerencial da tratativa")
-    if tratativa_df.empty:
-        st.caption("Nenhum caso tratado ou salvo no período selecionado.")
-    else:
-        resumo_tratativa_geral = resumo_tratativa_lote(tratativa_df)
-        visao_tratativa = st.segmented_control(
-            "Visão da tratativa",
-            options=["Painel", "Rankings", "Exportações"],
-            default="Painel",
-            selection_mode="single",
-            key="treatment_dashboard_view",
-        )
-
-        if visao_tratativa == "Painel":
-            st.markdown("##### Painel de tratativa")
+    if area_operacional == "Tratativas":
+        st.markdown("#### Visão gerencial da tratativa")
+        st.caption("Acompanhe o andamento analítico dos casos já revisados, sem misturar essa leitura com a operação dos lotes.")
+        if tratativa_df.empty:
+            st.caption("Nenhum caso tratado ou salvo no período selecionado.")
+        else:
+            resumo_tratativa_geral = resumo_tratativa_lote(tratativa_df)
             gt1, gt2, gt3, gt4 = st.columns(4)
             render_batch_metric(gt1, "Novos", resumo_tratativa_geral["Novo"]["quantidade"], formatar_brl(resumo_tratativa_geral["Novo"]["valor"]))
             render_batch_metric(gt2, "Em análise", resumo_tratativa_geral["Em análise"]["quantidade"], formatar_brl(resumo_tratativa_geral["Em análise"]["valor"]))
             render_batch_metric(gt3, "Confirmados", resumo_tratativa_geral["Confirmado"]["quantidade"], formatar_brl(resumo_tratativa_geral["Confirmado"]["valor"]))
             render_batch_metric(gt4, "Descartados", resumo_tratativa_geral["Descartado"]["quantidade"], formatar_brl(resumo_tratativa_geral["Descartado"]["valor"]))
+            st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
-        elif visao_tratativa == "Rankings":
+    elif area_operacional == "Rankings":
+        st.markdown("#### Rankings")
+        st.caption("Visualize quem mais concentra confirmações e quais revisores estão mais ativos no período filtrado.")
+        if tratativa_df.empty:
+            st.caption("Nenhum caso tratado ou salvo no período selecionado.")
+        else:
             g1, g2 = st.columns(2)
             with g1:
                 st.markdown("##### Prestadores com mais confirmações")
@@ -3355,9 +3361,14 @@ if allowed_view_lots:
                     top_revisores.index.name = "Revisor"
                     top_revisores.name = "Tratativas"
                     st.dataframe(top_revisores, use_container_width=True)
+            st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
+    elif area_operacional == "Exportações":
+        st.markdown("#### Exportações")
+        st.caption("Baixe recortes operacionais da tratativa por status, sem precisar abrir um lote específico.")
+        if tratativa_df.empty:
+            st.caption("Nenhum caso tratado ou salvo no período selecionado.")
         else:
-            st.markdown("##### Exportação por status")
             export_cols = st.columns(4)
             status_slug = {
                 "Novo": "novo",
@@ -3376,255 +3387,257 @@ if allowed_view_lots:
                         use_container_width=True,
                         disabled=dados_status.empty,
                     )
+            st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
-
-    lotes_df = load_batch_history(limit=limite_lotes, start_date=start_date, end_date=end_date)
-    if filtro_usuario != "Todos" and not lotes_df.empty:
-        lotes_df = lotes_df[lotes_df["uploaded_by"] == filtro_usuario].copy()
-    if lotes_df.empty:
-        st.caption("Nenhum lote encontrado para o período selecionado.")
-    else:
-        lotes_exibicao = lotes_df.copy()
-        lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
-        lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
-        lotes_exibicao["notes_preview"] = lotes_exibicao["notes"].fillna("").apply(
-            lambda valor: (valor[:60] + "...") if len(valor) > 60 else (valor or "Sem observação")
-        )
-        lotes_exibicao = lotes_exibicao.rename(
-            columns={
-                "batch_ref": "Referência do lote",
-                "batch_name": "Nome do lote",
-                "segment": "Segmento",
-                "uploaded_by": "Enviado por",
-                "status": "Status",
-                "notes_preview": "Observação",
-                "total_documentos": "XMLs",
-                "total_alertas": "Alertas",
-                "created_at": "Processado em",
-                "valor_total": "Valor total",
-                "valor_alerta": "Valor em alerta",
-            }
-        )
-        st.dataframe(
-            lotes_exibicao,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Referência do lote": st.column_config.TextColumn("Referência do lote", width="large"),
-                "Nome do lote": st.column_config.TextColumn("Nome do lote", width="medium"),
-                "Segmento": st.column_config.TextColumn("Segmento", width="small"),
-                "Enviado por": st.column_config.TextColumn("Enviado por", width="medium"),
-                "Status": st.column_config.TextColumn("Status", width="medium"),
-                "Observação": st.column_config.TextColumn("Observação", width="large"),
-                "XMLs": st.column_config.NumberColumn("XMLs", width="small", format="%d"),
-                "Alertas": st.column_config.NumberColumn("Alertas", width="small", format="%d"),
-                "Processado em": st.column_config.TextColumn("Processado em", width="large"),
-                "Valor total": st.column_config.TextColumn("Valor total", width="medium"),
-                "Valor em alerta": st.column_config.TextColumn("Valor em alerta", width="medium"),
-            },
-        )
-        lot_view_mode = st.segmented_control(
-            "Visão dos lotes",
-            options=["Lista de lotes", "Detalhe do lote"],
-            default=st.session_state.get("lot_view_mode", "Lista de lotes"),
-            selection_mode="single",
-            key="lot_view_segmented",
-        )
-        st.session_state["lot_view_mode"] = lot_view_mode
-        st.caption("Selecione um lote para abrir o detalhe, acompanhar seus indicadores e, quando autorizado, editar ou excluir.")
-
-        opcoes_lote = {
-            f'{row["batch_name"]} · {row["created_at"]} · {row["total_documentos"]} XMLs': row["batch_ref"]
-            for _, row in lotes_df.iterrows()
-        }
-        if "selected_batch_ref" not in st.session_state and opcoes_lote:
-            st.session_state["selected_batch_ref"] = next(iter(opcoes_lote.values()))
-
-        st.markdown("#### Selecionar lote")
-        lote_label = st.selectbox(
-            "Selecionar lote",
-            list(opcoes_lote.keys()),
-            index=list(opcoes_lote.values()).index(st.session_state["selected_batch_ref"])
-            if st.session_state["selected_batch_ref"] in opcoes_lote.values()
-            else 0,
-            help="Escolha um lote enviado para abrir o detalhe, editar o nome comercial ou excluir o histórico desse envio.",
-            label_visibility="collapsed",
-        )
-        lote_ref = opcoes_lote[lote_label]
-        st.session_state["selected_batch_ref"] = lote_ref
-        lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
-        if "editing_batch_ref" not in st.session_state:
-            st.session_state["editing_batch_ref"] = None
-
-        a1, a2, a3 = st.columns(3)
-        with a1:
-            if st.button("Abrir lote", use_container_width=True):
-                st.session_state["opened_batch_ref"] = lote_ref
-                st.session_state["editing_batch_ref"] = None
-                st.session_state["lot_view_mode"] = "Detalhe do lote"
-        with a2:
-            editar_lote = st.button("Editar lote", use_container_width=True, disabled=not allowed_edit_lots)
-            if editar_lote and allowed_edit_lots:
-                st.session_state["editing_batch_ref"] = lote_ref
-                st.session_state["lot_view_mode"] = "Detalhe do lote"
-        with a3:
-            excluir_lote = st.button("Excluir lote", use_container_width=True, type="secondary", disabled=not allowed_delete_lots)
-            if excluir_lote and allowed_delete_lots:
-                delete_batch(lote_ref)
-                st.success("Lote excluído do histórico.")
-                if st.session_state.get("opened_batch_ref") == lote_ref:
-                    st.session_state["opened_batch_ref"] = None
-                if st.session_state.get("editing_batch_ref") == lote_ref:
-                    st.session_state["editing_batch_ref"] = None
-                st.rerun()
-
-        if not allowed_edit_lots:
-            st.caption("O perfil atual pode consultar os lotes, mas apenas o acesso Master pode editar ou excluir.")
-
-        if st.session_state.get("editing_batch_ref") == lote_ref and allowed_edit_lots:
-            st.markdown("#### Editar lote")
-            edit_col1, edit_col2 = st.columns([1.2, 1])
-            with edit_col1:
-                novo_nome = st.text_input(
-                    "Novo nome do lote",
-                    value=lote_atual["batch_name"],
-                    key=f"rename_{lote_ref}",
-                )
-            with edit_col2:
-                novo_status = st.selectbox(
-                    "Status do lote",
-                    BATCH_STATUS_OPTIONS,
-                    index=BATCH_STATUS_OPTIONS.index(lote_atual["status"]) if lote_atual["status"] in BATCH_STATUS_OPTIONS else 0,
-                    key=f"status_{lote_ref}",
-                )
-            nova_observacao = st.text_area(
-                "Observação do lote",
-                value=lote_atual["notes"] or "",
-                key=f"notes_{lote_ref}",
-                help="Registre contexto operacional, achados ou orientação para o acompanhamento desse lote.",
-                height=100,
+    if area_operacional == "Lotes":
+        st.markdown("#### Lotes")
+        st.caption("Consulte o histórico operacional, abra detalhes de um lote específico e, quando permitido, edite ou exclua registros.")
+        lotes_df = load_batch_history(limit=limite_lotes, start_date=start_date, end_date=end_date)
+        if filtro_usuario != "Todos" and not lotes_df.empty:
+            lotes_df = lotes_df[lotes_df["uploaded_by"] == filtro_usuario].copy()
+        if lotes_df.empty:
+            st.caption("Nenhum lote encontrado para o período selecionado.")
+        else:
+            lotes_exibicao = lotes_df.copy()
+            lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
+            lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
+            lotes_exibicao["notes_preview"] = lotes_exibicao["notes"].fillna("").apply(
+                lambda valor: (valor[:60] + "...") if len(valor) > 60 else (valor or "Sem observação")
             )
-            salvar_col, spacer_col = st.columns([1, 2])
-            with salvar_col:
-                st.write("")
-                if st.button("Salvar lote", use_container_width=True):
-                    update_batch_metadata(
-                        lote_ref,
-                        novo_nome or lote_atual["batch_name"],
-                        novo_status,
-                        nova_observacao,
-                    )
-                    st.success("Lote atualizado.")
+            lotes_exibicao = lotes_exibicao.rename(
+                columns={
+                    "batch_ref": "Referência do lote",
+                    "batch_name": "Nome do lote",
+                    "segment": "Segmento",
+                    "uploaded_by": "Enviado por",
+                    "status": "Status",
+                    "notes_preview": "Observação",
+                    "total_documentos": "XMLs",
+                    "total_alertas": "Alertas",
+                    "created_at": "Processado em",
+                    "valor_total": "Valor total",
+                    "valor_alerta": "Valor em alerta",
+                }
+            )
+            st.dataframe(
+                lotes_exibicao,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Referência do lote": st.column_config.TextColumn("Referência do lote", width="large"),
+                    "Nome do lote": st.column_config.TextColumn("Nome do lote", width="medium"),
+                    "Segmento": st.column_config.TextColumn("Segmento", width="small"),
+                    "Enviado por": st.column_config.TextColumn("Enviado por", width="medium"),
+                    "Status": st.column_config.TextColumn("Status", width="medium"),
+                    "Observação": st.column_config.TextColumn("Observação", width="large"),
+                    "XMLs": st.column_config.NumberColumn("XMLs", width="small", format="%d"),
+                    "Alertas": st.column_config.NumberColumn("Alertas", width="small", format="%d"),
+                    "Processado em": st.column_config.TextColumn("Processado em", width="large"),
+                    "Valor total": st.column_config.TextColumn("Valor total", width="medium"),
+                    "Valor em alerta": st.column_config.TextColumn("Valor em alerta", width="medium"),
+                },
+            )
+            lot_view_mode = st.segmented_control(
+                "Visão dos lotes",
+                options=["Lista de lotes", "Detalhe do lote"],
+                default=st.session_state.get("lot_view_mode", "Lista de lotes"),
+                selection_mode="single",
+                key="lot_view_segmented",
+            )
+            st.session_state["lot_view_mode"] = lot_view_mode
+            st.caption("Selecione um lote para abrir o detalhe, acompanhar seus indicadores e, quando autorizado, editar ou excluir.")
+
+            opcoes_lote = {
+                f'{row["batch_name"]} · {row["created_at"]} · {row["total_documentos"]} XMLs': row["batch_ref"]
+                for _, row in lotes_df.iterrows()
+            }
+            if "selected_batch_ref" not in st.session_state and opcoes_lote:
+                st.session_state["selected_batch_ref"] = next(iter(opcoes_lote.values()))
+
+            st.markdown("#### Selecionar lote")
+            lote_label = st.selectbox(
+                "Selecionar lote",
+                list(opcoes_lote.keys()),
+                index=list(opcoes_lote.values()).index(st.session_state["selected_batch_ref"])
+                if st.session_state["selected_batch_ref"] in opcoes_lote.values()
+                else 0,
+                help="Escolha um lote enviado para abrir o detalhe, editar o nome comercial ou excluir o histórico desse envio.",
+                label_visibility="collapsed",
+            )
+            lote_ref = opcoes_lote[lote_label]
+            st.session_state["selected_batch_ref"] = lote_ref
+            lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
+            if "editing_batch_ref" not in st.session_state:
+                st.session_state["editing_batch_ref"] = None
+
+            a1, a2, a3 = st.columns(3)
+            with a1:
+                if st.button("Abrir lote", use_container_width=True):
+                    st.session_state["opened_batch_ref"] = lote_ref
                     st.session_state["editing_batch_ref"] = None
+                    st.session_state["lot_view_mode"] = "Detalhe do lote"
+            with a2:
+                editar_lote = st.button("Editar lote", use_container_width=True, disabled=not allowed_edit_lots)
+                if editar_lote and allowed_edit_lots:
+                    st.session_state["editing_batch_ref"] = lote_ref
+                    st.session_state["lot_view_mode"] = "Detalhe do lote"
+            with a3:
+                excluir_lote = st.button("Excluir lote", use_container_width=True, type="secondary", disabled=not allowed_delete_lots)
+                if excluir_lote and allowed_delete_lots:
+                    delete_batch(lote_ref)
+                    st.success("Lote excluído do histórico.")
+                    if st.session_state.get("opened_batch_ref") == lote_ref:
+                        st.session_state["opened_batch_ref"] = None
+                    if st.session_state.get("editing_batch_ref") == lote_ref:
+                        st.session_state["editing_batch_ref"] = None
                     st.rerun()
 
-        if st.session_state.get("opened_batch_ref") == lote_ref and st.session_state.get("lot_view_mode") == "Detalhe do lote":
-            docs_lote = load_batch_documents(lote_ref)
-            st.markdown("#### Detalhe do lote")
-            d1, d2, d3, d4 = st.columns(4)
-            render_batch_metric(d1, "XMLs", int(lote_atual["total_documentos"]))
-            render_batch_metric(d2, "Alertas", int(lote_atual["total_alertas"]))
-            render_batch_metric(d3, "Valor total", formatar_brl(float(lote_atual["valor_total"])))
-            render_batch_metric(d4, "Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
-            st.caption(
-                f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Status: {lote_atual["status"]} | Referência: {lote_ref}'
-            )
-            if (lote_atual.get("notes") or "").strip():
-                st.info(f'Observação do lote: {lote_atual["notes"]}')
-            if docs_lote.empty:
-                st.caption("Nenhum documento encontrado para este lote.")
-            else:
-                csv_lote = docs_lote.to_csv(index=False).encode("utf-8-sig")
-                acao_col1, acao_col2 = st.columns([1, 1.2])
-                with acao_col1:
-                    st.download_button(
-                        "Exportar CSV do lote",
-                        data=csv_lote,
-                        file_name=f"{lote_atual['batch_name']}_detalhe_lote.csv".replace(" ", "_"),
-                        mime="text/csv",
-                        use_container_width=True,
+            if not allowed_edit_lots:
+                st.caption("O perfil atual pode consultar os lotes, mas apenas o acesso Master pode editar ou excluir.")
+
+            if st.session_state.get("editing_batch_ref") == lote_ref and allowed_edit_lots:
+                st.markdown("#### Editar lote")
+                edit_col1, edit_col2 = st.columns([1.2, 1])
+                with edit_col1:
+                    novo_nome = st.text_input(
+                        "Novo nome do lote",
+                        value=lote_atual["batch_name"],
+                        key=f"rename_{lote_ref}",
                     )
-                with acao_col2:
-                    filtro_case_status = st.selectbox(
-                        "Filtrar casos do lote por status",
-                        ["Todos"] + CASE_STATUS_OPTIONS,
-                        index=0,
-                        help="Filtre a tabela do lote pelo andamento da tratativa analítica.",
-                        key=f"case_filter_{lote_ref}",
+                with edit_col2:
+                    novo_status = st.selectbox(
+                        "Status do lote",
+                        BATCH_STATUS_OPTIONS,
+                        index=BATCH_STATUS_OPTIONS.index(lote_atual["status"]) if lote_atual["status"] in BATCH_STATUS_OPTIONS else 0,
+                        key=f"status_{lote_ref}",
                     )
-                docs_lote_exibicao = docs_lote.copy()
-                if filtro_case_status != "Todos":
-                    docs_lote_exibicao = docs_lote_exibicao[docs_lote_exibicao["case_status"] == filtro_case_status].copy()
-                if allowed_review_cases:
-                    st.markdown("#### Tratativa do caso")
-                    opcoes_caso = {
-                        f'{row["arquivo"]} · {row["classificacao_final"]} · {row["valor_nf"]}': int(row["id"])
-                        for _, row in docs_lote_exibicao.iterrows()
-                    }
-                    if opcoes_caso:
-                        caso_label = st.selectbox(
-                            "Selecionar caso do lote",
-                            list(opcoes_caso.keys()),
-                            help="Escolha um documento do lote para registrar o andamento da análise.",
-                        )
-                        caso_id = opcoes_caso[caso_label]
-                        caso_atual = docs_lote_exibicao[docs_lote_exibicao["id"] == caso_id].iloc[0]
-                        review_col1, review_col2 = st.columns([1, 2])
-                        with review_col1:
-                            novo_case_status = st.selectbox(
-                                "Status do caso",
-                                CASE_STATUS_OPTIONS,
-                                index=CASE_STATUS_OPTIONS.index(caso_atual["case_status"]) if caso_atual["case_status"] in CASE_STATUS_OPTIONS else 0,
-                                key=f"case_status_{caso_id}",
-                            )
-                        with review_col2:
-                            nova_case_note = st.text_area(
-                                "Observação do analista",
-                                value=caso_atual["analyst_note"] or "",
-                                key=f"case_note_{caso_id}",
-                                height=90,
-                            )
-                        if st.button("Salvar tratativa", key=f"save_case_{caso_id}", use_container_width=False):
-                            update_case_review(caso_id, novo_case_status, nova_case_note, auth_user["username"])
-                            st.success("Tratativa do caso atualizada.")
-                            st.rerun()
-                        if (caso_atual.get("reviewed_by") or "").strip():
-                            st.caption(
-                                f'Última revisão: {caso_atual["reviewed_by"]} em {caso_atual["reviewed_at"] or "data não registrada"}'
-                            )
-                    else:
-                        st.caption("Nenhum caso encontrado para o status filtrado.")
-                else:
-                    st.caption("O perfil atual pode consultar os casos do lote, mas a tratativa analítica fica disponível para perfis Gerencial e Master.")
-                st.dataframe(
-                    docs_lote_exibicao[
-                        [
-                            "arquivo",
-                            "paciente",
-                            "prestador",
-                            "procedimento",
-                            "valor_nf",
-                            "score_final",
-                            "classificacao_final",
-                            "case_status",
-                            "reviewed_by",
-                            "motivo_tecnico",
-                            "motivo_comportamental",
-                        ]
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
+                nova_observacao = st.text_area(
+                    "Observação do lote",
+                    value=lote_atual["notes"] or "",
+                    key=f"notes_{lote_ref}",
+                    help="Registre contexto operacional, achados ou orientação para o acompanhamento desse lote.",
+                    height=100,
                 )
-                st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
-                footer_col1, footer_col2 = st.columns([1, 3])
-                with footer_col1:
-                    if st.button("Fechar lote", key=f"close_batch_{lote_ref}", use_container_width=True):
-                        st.session_state["opened_batch_ref"] = None
+                salvar_col, spacer_col = st.columns([1, 2])
+                with salvar_col:
+                    st.write("")
+                    if st.button("Salvar lote", use_container_width=True):
+                        update_batch_metadata(
+                            lote_ref,
+                            novo_nome or lote_atual["batch_name"],
+                            novo_status,
+                            nova_observacao,
+                        )
+                        st.success("Lote atualizado.")
                         st.session_state["editing_batch_ref"] = None
-                        st.session_state["lot_view_mode"] = "Lista de lotes"
-                        st.success("Detalhe do lote fechado.")
                         st.rerun()
+
+            if st.session_state.get("opened_batch_ref") == lote_ref and st.session_state.get("lot_view_mode") == "Detalhe do lote":
+                docs_lote = load_batch_documents(lote_ref)
+                st.markdown("#### Detalhe do lote")
+                d1, d2, d3, d4 = st.columns(4)
+                render_batch_metric(d1, "XMLs", int(lote_atual["total_documentos"]))
+                render_batch_metric(d2, "Alertas", int(lote_atual["total_alertas"]))
+                render_batch_metric(d3, "Valor total", formatar_brl(float(lote_atual["valor_total"])))
+                render_batch_metric(d4, "Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
+                st.caption(
+                    f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Status: {lote_atual["status"]} | Referência: {lote_ref}'
+                )
+                if (lote_atual.get("notes") or "").strip():
+                    st.info(f'Observação do lote: {lote_atual["notes"]}')
+                if docs_lote.empty:
+                    st.caption("Nenhum documento encontrado para este lote.")
+                else:
+                    csv_lote = docs_lote.to_csv(index=False).encode("utf-8-sig")
+                    acao_col1, acao_col2 = st.columns([1, 1.2])
+                    with acao_col1:
+                        st.download_button(
+                            "Exportar CSV do lote",
+                            data=csv_lote,
+                            file_name=f"{lote_atual['batch_name']}_detalhe_lote.csv".replace(" ", "_"),
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
+                    with acao_col2:
+                        filtro_case_status = st.selectbox(
+                            "Filtrar casos do lote por status",
+                            ["Todos"] + CASE_STATUS_OPTIONS,
+                            index=0,
+                            help="Filtre a tabela do lote pelo andamento da tratativa analítica.",
+                            key=f"case_filter_{lote_ref}",
+                        )
+                    docs_lote_exibicao = docs_lote.copy()
+                    if filtro_case_status != "Todos":
+                        docs_lote_exibicao = docs_lote_exibicao[docs_lote_exibicao["case_status"] == filtro_case_status].copy()
+                    if allowed_review_cases:
+                        st.markdown("#### Tratativa do caso")
+                        opcoes_caso = {
+                            f'{row["arquivo"]} · {row["classificacao_final"]} · {row["valor_nf"]}': int(row["id"])
+                            for _, row in docs_lote_exibicao.iterrows()
+                        }
+                        if opcoes_caso:
+                            caso_label = st.selectbox(
+                                "Selecionar caso do lote",
+                                list(opcoes_caso.keys()),
+                                help="Escolha um documento do lote para registrar o andamento da análise.",
+                            )
+                            caso_id = opcoes_caso[caso_label]
+                            caso_atual = docs_lote_exibicao[docs_lote_exibicao["id"] == caso_id].iloc[0]
+                            review_col1, review_col2 = st.columns([1, 2])
+                            with review_col1:
+                                novo_case_status = st.selectbox(
+                                    "Status do caso",
+                                    CASE_STATUS_OPTIONS,
+                                    index=CASE_STATUS_OPTIONS.index(caso_atual["case_status"]) if caso_atual["case_status"] in CASE_STATUS_OPTIONS else 0,
+                                    key=f"case_status_{caso_id}",
+                                )
+                            with review_col2:
+                                nova_case_note = st.text_area(
+                                    "Observação do analista",
+                                    value=caso_atual["analyst_note"] or "",
+                                    key=f"case_note_{caso_id}",
+                                    height=90,
+                                )
+                            if st.button("Salvar tratativa", key=f"save_case_{caso_id}", use_container_width=False):
+                                update_case_review(caso_id, novo_case_status, nova_case_note, auth_user["username"])
+                                st.success("Tratativa do caso atualizada.")
+                                st.rerun()
+                            if (caso_atual.get("reviewed_by") or "").strip():
+                                st.caption(
+                                    f'Última revisão: {caso_atual["reviewed_by"]} em {caso_atual["reviewed_at"] or "data não registrada"}'
+                                )
+                        else:
+                            st.caption("Nenhum caso encontrado para o status filtrado.")
+                    else:
+                        st.caption("O perfil atual pode consultar os casos do lote, mas a tratativa analítica fica disponível para perfis Gerencial e Master.")
+                    st.dataframe(
+                        docs_lote_exibicao[
+                            [
+                                "arquivo",
+                                "paciente",
+                                "prestador",
+                                "procedimento",
+                                "valor_nf",
+                                "score_final",
+                                "classificacao_final",
+                                "case_status",
+                                "reviewed_by",
+                                "motivo_tecnico",
+                                "motivo_comportamental",
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+                    footer_col1, footer_col2 = st.columns([1, 3])
+                    with footer_col1:
+                        if st.button("Fechar lote", key=f"close_batch_{lote_ref}", use_container_width=True):
+                            st.session_state["opened_batch_ref"] = None
+                            st.session_state["editing_batch_ref"] = None
+                            st.session_state["lot_view_mode"] = "Lista de lotes"
+                            st.success("Detalhe do lote fechado.")
+                            st.rerun()
 else:
     st.info("Seu perfil atual não tem acesso ao histórico de lotes.")
 
