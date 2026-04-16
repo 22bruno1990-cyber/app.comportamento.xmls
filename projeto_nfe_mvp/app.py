@@ -3310,7 +3310,7 @@ if allowed_view_lots:
     limite_lotes = 12 if filtro_periodo == "Últimos lançamentos" else None
     tratativa_df = load_case_review_dashboard(start_date=start_date, end_date=end_date)
 
-    st.markdown("#### Painel gerencial da tratativa")
+    st.markdown("#### Visão gerencial da tratativa")
     if tratativa_df.empty:
         st.caption("Nenhum caso tratado ou salvo no período selecionado.")
     else:
@@ -3324,6 +3324,7 @@ if allowed_view_lots:
         )
 
         if visao_tratativa == "Painel":
+            st.markdown("##### Painel de tratativa")
             gt1, gt2, gt3, gt4 = st.columns(4)
             render_batch_metric(gt1, "Novos", resumo_tratativa_geral["Novo"]["quantidade"], formatar_brl(resumo_tratativa_geral["Novo"]["valor"]))
             render_batch_metric(gt2, "Em análise", resumo_tratativa_geral["Em análise"]["quantidade"], formatar_brl(resumo_tratativa_geral["Em análise"]["valor"]))
