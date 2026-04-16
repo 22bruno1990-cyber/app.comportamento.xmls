@@ -2670,6 +2670,56 @@ def resumo_tratativa_lote(docs_lote):
     return resumo
 
 
+def load_case_review_dashboard(start_date=None, end_date=None):
+    inicializar_banco()
+    filters = []
+    params = []
+    if start_date:
+        filters.append("analisado_em >= ?")
+        params.append(f"{start_date} 00:00:00")
+    if end_date:
+        filters.append("analisado_em <= ?")
+        params.append(f"{end_date} 23:59:59")
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+    with get_db_connection() as conn:
+        rows = db_fetchall(
+            conn,
+            f"""
+            SELECT
+                arquivo,
+                prestador,
+                valor_nf,
+                valor_nf_num,
+                classificacao_final,
+                case_status,
+                reviewed_by,
+                reviewed_at,
+                analisado_em
+            FROM nfe_documents
+            {where_clause}
+            ORDER BY analisado_em DESC
+            """,
+            tuple(params) if params else None,
+        )
+
+    normalizados = []
+    for row in rows:
+        if isinstance(row, dict):
+            normalizados.append(row)
+        else:
+            normalizados.append(dict(row))
+    df = pd.DataFrame(normalizados)
+    if df.empty:
+        return df
+
+    df["case_status"] = df["case_status"].fillna("Novo").replace("", "Novo")
+    df["reviewed_by"] = df["reviewed_by"].fillna("Não revisado").replace("", "Não revisado")
+    df["prestador"] = df["prestador"].fillna("Não informado").replace("", "Não informado")
+    df["valor_nf_num"] = pd.to_numeric(df["valor_nf_num"], errors="coerce").fillna(0.0)
+    return df
+
+
 def categoria_trilha_risco(classificacao):
     if classificacao == "REAPRESENTACAO":
         return "FRAUDE FORTE"
@@ -3256,6 +3306,65 @@ if allowed_view_lots:
             data_inicial, data_final = data_final, data_inicial
     start_date, end_date = resolver_periodo_lotes(filtro_periodo, data_inicial, data_final)
     limite_lotes = 12 if filtro_periodo == "Últimos lançamentos" else None
+    tratativa_df = load_case_review_dashboard(start_date=start_date, end_date=end_date)
+
+    st.markdown("#### Painel gerencial da tratativa")
+    if tratativa_df.empty:
+        st.caption("Nenhum caso tratado ou salvo no período selecionado.")
+    else:
+        resumo_tratativa_geral = resumo_tratativa_lote(tratativa_df)
+        gt1, gt2, gt3, gt4 = st.columns(4)
+        render_batch_metric(gt1, "Novos", resumo_tratativa_geral["Novo"]["quantidade"], formatar_brl(resumo_tratativa_geral["Novo"]["valor"]))
+        render_batch_metric(gt2, "Em análise", resumo_tratativa_geral["Em análise"]["quantidade"], formatar_brl(resumo_tratativa_geral["Em análise"]["valor"]))
+        render_batch_metric(gt3, "Confirmados", resumo_tratativa_geral["Confirmado"]["quantidade"], formatar_brl(resumo_tratativa_geral["Confirmado"]["valor"]))
+        render_batch_metric(gt4, "Descartados", resumo_tratativa_geral["Descartado"]["quantidade"], formatar_brl(resumo_tratativa_geral["Descartado"]["valor"]))
+
+        g1, g2 = st.columns(2)
+        with g1:
+            st.markdown("##### Prestadores com mais confirmações")
+            top_confirmados = (
+                tratativa_df[tratativa_df["case_status"] == "Confirmado"]["prestador"]
+                .value_counts()
+                .head(5)
+            )
+            if top_confirmados.empty:
+                st.caption("Nenhum caso confirmado no período.")
+            else:
+                top_confirmados.index.name = "Prestador"
+                top_confirmados.name = "Casos confirmados"
+                st.dataframe(top_confirmados, use_container_width=True)
+        with g2:
+            st.markdown("##### Revisores mais ativos")
+            top_revisores = tratativa_df["reviewed_by"].value_counts().head(5)
+            if top_revisores.empty:
+                st.caption("Nenhuma revisão registrada no período.")
+            else:
+                top_revisores.index.name = "Revisor"
+                top_revisores.name = "Tratativas"
+                st.dataframe(top_revisores, use_container_width=True)
+
+        st.markdown("##### Exportação por status")
+        export_cols = st.columns(4)
+        status_slug = {
+            "Novo": "novo",
+            "Em análise": "em_analise",
+            "Confirmado": "confirmado",
+            "Descartado": "descartado",
+        }
+        for idx, status in enumerate(CASE_STATUS_OPTIONS):
+            dados_status = tratativa_df[tratativa_df["case_status"] == status].copy()
+            with export_cols[idx]:
+                st.download_button(
+                    f"Exportar {status}",
+                    data=dados_status.to_csv(index=False).encode("utf-8-sig"),
+                    file_name=f"tratativa_{status_slug[status]}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    disabled=dados_status.empty,
+                )
+
+        st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+
     lotes_df = load_batch_history(limit=limite_lotes, start_date=start_date, end_date=end_date)
     if filtro_usuario != "Todos" and not lotes_df.empty:
         lotes_df = lotes_df[lotes_df["uploaded_by"] == filtro_usuario].copy()
