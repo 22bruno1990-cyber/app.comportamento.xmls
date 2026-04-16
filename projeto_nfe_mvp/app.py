@@ -706,6 +706,21 @@ SEGMENT_COPY = {
     },
 }
 
+ROLE_DEFINITIONS = {
+    "master": {
+        "label": "Master",
+        "description": "Acesso completo para gestão, upload, histórico e administração dos lotes.",
+    },
+    "gerencial": {
+        "label": "Gerencial",
+        "description": "Acesso para consulta executiva, acompanhamento e leitura dos lotes processados.",
+    },
+    "operacional": {
+        "label": "Operacional",
+        "description": "Acesso para upload, análise e registro dos lotes operacionais.",
+    },
+}
+
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
@@ -792,17 +807,76 @@ def verify_password(password, stored_hash):
         return False
 
 
-def get_admin_credentials():
-    admin_username = ""
-    admin_password = ""
+def normalize_role(role):
+    role_key = normalizar_texto(role)
+    if role_key in {"admin", "master"}:
+        return "master"
+    if role_key in {"gerencial", "gerente", "manager"}:
+        return "gerencial"
+    if role_key in {"operacional", "operacao", "operator"}:
+        return "operacional"
+    return role_key or "operacional"
+
+
+def role_label(role):
+    return ROLE_DEFINITIONS.get(normalize_role(role), ROLE_DEFINITIONS["operacional"])["label"]
+
+
+def can_upload(user):
+    return normalize_role(user.get("role")) in {"master", "operacional"}
+
+
+def can_save_history(user):
+    return normalize_role(user.get("role")) in {"master", "operacional"}
+
+
+def can_view_lots(user):
+    return normalize_role(user.get("role")) in {"master", "gerencial", "operacional"}
+
+
+def can_edit_lots(user):
+    return normalize_role(user.get("role")) == "master"
+
+
+def can_delete_lots(user):
+    return normalize_role(user.get("role")) == "master"
+
+
+def get_bootstrap_users():
+    secrets_map = {}
     try:
-        admin_username = st.secrets.get("ADMIN_USERNAME", "")
-        admin_password = st.secrets.get("ADMIN_PASSWORD", "")
+        secrets_map = dict(st.secrets)
     except Exception:
-        pass
-    admin_username = admin_username or os.getenv("ADMIN_USERNAME", "")
-    admin_password = admin_password or os.getenv("ADMIN_PASSWORD", "")
-    return admin_username.strip(), admin_password.strip()
+        secrets_map = {}
+
+    users = []
+    credential_sources = [
+        ("master", secrets_map.get("MASTER_USERNAME", "") or secrets_map.get("ADMIN_USERNAME", ""), secrets_map.get("MASTER_PASSWORD", "") or secrets_map.get("ADMIN_PASSWORD", "")),
+        ("gerencial", secrets_map.get("GERENCIAL_USERNAME", ""), secrets_map.get("GERENCIAL_PASSWORD", "")),
+        ("operacional", secrets_map.get("OPERACIONAL_USERNAME", ""), secrets_map.get("OPERACIONAL_PASSWORD", "")),
+    ]
+    env_sources = [
+        ("master", os.getenv("MASTER_USERNAME", "") or os.getenv("ADMIN_USERNAME", ""), os.getenv("MASTER_PASSWORD", "") or os.getenv("ADMIN_PASSWORD", "")),
+        ("gerencial", os.getenv("GERENCIAL_USERNAME", ""), os.getenv("GERENCIAL_PASSWORD", "")),
+        ("operacional", os.getenv("OPERACIONAL_USERNAME", ""), os.getenv("OPERACIONAL_PASSWORD", "")),
+    ]
+
+    for idx, (role, username, password) in enumerate(credential_sources):
+        env_username, env_password = env_sources[idx][1], env_sources[idx][2]
+        username = (username or env_username or "").strip()
+        password = (password or env_password or "").strip()
+        if username and password:
+            users.append({"role": role, "username": username, "password": password})
+
+    deduped = []
+    seen = set()
+    for user in users:
+        key = user["username"].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(user)
+    return deduped
 
 
 def inicializar_banco():
@@ -954,34 +1028,37 @@ def inicializar_banco():
 
 
 def bootstrap_admin_user():
-    admin_username, admin_password = get_admin_credentials()
-    if not admin_username or not admin_password:
+    bootstrap_users = get_bootstrap_users()
+    if not bootstrap_users:
         return
 
     with get_db_connection() as conn:
-        existing = db_fetchone(
-            conn,
-            "SELECT username, password_hash FROM app_users WHERE username = ?",
-            (admin_username,),
-        )
-        if existing:
-            if not verify_password(admin_password, existing["password_hash"]):
-                db_execute(
-                    conn,
-                    "UPDATE app_users SET password_hash = ?, role = 'admin', active = TRUE WHERE username = ?",
-                    (hash_password(admin_password), admin_username),
-                )
-                conn.commit()
-            return
-
-        db_execute(
-            conn,
-            """
-            INSERT INTO app_users (username, password_hash, role, active)
-            VALUES (?, ?, 'admin', TRUE)
-            """,
-            (admin_username, hash_password(admin_password)),
-        )
+        for user in bootstrap_users:
+            existing = db_fetchone(
+                conn,
+                "SELECT username, password_hash, role FROM app_users WHERE username = ?",
+                (user["username"],),
+            )
+            desired_role = normalize_role(user["role"])
+            if existing:
+                if (
+                    not verify_password(user["password"], existing["password_hash"])
+                    or normalize_role(existing["role"]) != desired_role
+                ):
+                    db_execute(
+                        conn,
+                        "UPDATE app_users SET password_hash = ?, role = ?, active = TRUE WHERE username = ?",
+                        (hash_password(user["password"]), desired_role, user["username"]),
+                    )
+                continue
+            db_execute(
+                conn,
+                """
+                INSERT INTO app_users (username, password_hash, role, active)
+                VALUES (?, ?, ?, TRUE)
+                """,
+                (user["username"], hash_password(user["password"]), desired_role),
+            )
         conn.commit()
 
 
@@ -1007,7 +1084,7 @@ def load_history_stats():
     }
 
 
-def authenticate_user(username, password):
+def authenticate_user(username, password, required_role=None):
     inicializar_banco()
     if not username or not password:
         return None
@@ -1029,7 +1106,10 @@ def authenticate_user(username, password):
         return None
     if not verify_password(password, user["password_hash"]):
         return None
-    return {"username": user["username"], "role": user["role"]}
+    normalized_role = normalize_role(user["role"])
+    if required_role and normalized_role != normalize_role(required_role):
+        return None
+    return {"username": user["username"], "role": normalized_role}
 
 
 def registrar_lote_upload(df, origem_upload, segment, uploaded_by):
@@ -1227,25 +1307,42 @@ def render_login_cover():
     st.markdown('<div style="height: 22vh;"></div>', unsafe_allow_html=True)
     _, center_col, _ = st.columns([1.6, 1, 1.6])
     with center_col:
-        admin_username, admin_password = get_admin_credentials()
-        if admin_username and admin_password:
+        bootstrap_users = get_bootstrap_users()
+        if bootstrap_users:
+            available_roles = [role for role in ROLE_DEFINITIONS if any(normalize_role(user["role"]) == role for user in bootstrap_users)]
+            role_options = [ROLE_DEFINITIONS[role]["label"] for role in available_roles]
+            selected_label = st.radio(
+                "Tipo de acesso",
+                role_options,
+                horizontal=True,
+                key="cover_access_label",
+            )
+            selected_role = next(
+                role_key
+                for role_key in available_roles
+                if ROLE_DEFINITIONS[role_key]["label"] == selected_label
+            )
+            st.caption(ROLE_DEFINITIONS[selected_role]["description"])
             with st.form("login_cover_form"):
                 username_input = st.text_input("Usuário", key="cover_username")
                 password_input = st.text_input("Senha", type="password", key="cover_password")
                 entrou = st.form_submit_button("Entrar", use_container_width=True)
-            st.markdown(
-                '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
-                unsafe_allow_html=True,
-            )
             if entrou:
-                auth_user = authenticate_user(username_input, password_input)
+                auth_user = authenticate_user(username_input, password_input, required_role=selected_role)
                 if auth_user:
                     st.session_state["auth_user"] = auth_user
                     st.rerun()
                 else:
-                    st.error("Usuário ou senha inválidos.")
+                    st.error(f"Credenciais inválidas para o perfil {ROLE_DEFINITIONS[selected_role]['label']}.")
+            st.markdown(
+                '<div class="login-helper">Acesso restrito a usuários autorizados.</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            st.warning("Faltam `ADMIN_USERNAME` e `ADMIN_PASSWORD` no Secrets para liberar o acesso autenticado.")
+            st.warning(
+                "Faltam credenciais no Secrets para liberar o acesso autenticado. "
+                "Use `MASTER_`, `GERENCIAL_` e `OPERACIONAL_` ou mantenha `ADMIN_` para o perfil master."
+            )
 
 
 def query_scalar(conn, query, params):
@@ -2842,14 +2939,24 @@ if not st.session_state["auth_user"]:
     render_login_cover()
     st.stop()
 
+auth_user = st.session_state["auth_user"]
+auth_role = normalize_role(auth_user["role"])
+auth_role_label = role_label(auth_role)
+allowed_upload = can_upload(auth_user)
+allowed_save_history = can_save_history(auth_user)
+allowed_view_lots = can_view_lots(auth_user)
+allowed_edit_lots = can_edit_lots(auth_user)
+allowed_delete_lots = can_delete_lots(auth_user)
+
 with st.sidebar:
     historico = load_history_stats()
     segmento = st.radio("Segmento da apresentação", list(SEGMENT_COPY.keys()), index=0)
     copy = SEGMENT_COPY[segmento]
     st.markdown("## Sessão")
     st.success(
-        f'Conectado como **{st.session_state["auth_user"]["username"]}** ({st.session_state["auth_user"]["role"]})'
+        f'Conectado como **{auth_user["username"]}** ({auth_role_label})'
     )
+    st.caption(ROLE_DEFINITIONS[auth_role]["description"])
     if st.button("Encerrar sessão", use_container_width=True):
         st.session_state["auth_user"] = None
         st.rerun()
@@ -2871,127 +2978,139 @@ with st.sidebar:
 
 render_hero(copy)
 render_pitch(copy)
-st.markdown("### Histórico de lotes")
-lotes_df = load_batch_history()
-if lotes_df.empty:
-    st.caption("Nenhum lote registrado ainda.")
-else:
-    lotes_exibicao = lotes_df.copy()
-    lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
-    lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
-    lotes_exibicao = lotes_exibicao.rename(
-        columns={
-            "batch_ref": "referencia_lote",
-            "batch_name": "nome_lote",
-            "segment": "segmento",
-            "uploaded_by": "enviado_por",
-            "total_documentos": "xmls",
-            "total_alertas": "alertas",
-            "created_at": "processado_em",
-            "valor_total": "valor_total",
-            "valor_alerta": "valor_em_alerta",
+if allowed_view_lots:
+    st.markdown("### Histórico de lotes")
+    lotes_df = load_batch_history()
+    if lotes_df.empty:
+        st.caption("Nenhum lote registrado ainda.")
+    else:
+        lotes_exibicao = lotes_df.copy()
+        lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
+        lotes_exibicao["valor_alerta"] = lotes_exibicao["valor_alerta"].apply(formatar_brl)
+        lotes_exibicao = lotes_exibicao.rename(
+            columns={
+                "batch_ref": "referencia_lote",
+                "batch_name": "nome_lote",
+                "segment": "segmento",
+                "uploaded_by": "enviado_por",
+                "total_documentos": "xmls",
+                "total_alertas": "alertas",
+                "created_at": "processado_em",
+                "valor_total": "valor_total",
+                "valor_alerta": "valor_em_alerta",
+            }
+        )
+        st.dataframe(lotes_exibicao, use_container_width=True, hide_index=True)
+        st.caption("Selecione um lote para abrir o detalhe, acompanhar seus indicadores e, quando autorizado, editar ou excluir.")
+
+        opcoes_lote = {
+            f'{row["batch_name"]} · {row["created_at"]} · {row["total_documentos"]} XMLs': row["batch_ref"]
+            for _, row in lotes_df.iterrows()
         }
-    )
-    st.dataframe(lotes_exibicao, use_container_width=True, hide_index=True)
-    st.caption("Selecione um lote para abrir o detalhe, renomear a referência de negócio ou excluir o histórico desse envio.")
+        if "selected_batch_ref" not in st.session_state and opcoes_lote:
+            st.session_state["selected_batch_ref"] = next(iter(opcoes_lote.values()))
 
-    opcoes_lote = {
-        f'{row["batch_name"]} · {row["created_at"]} · {row["total_documentos"]} XMLs': row["batch_ref"]
-        for _, row in lotes_df.iterrows()
-    }
-    if "selected_batch_ref" not in st.session_state and opcoes_lote:
-        st.session_state["selected_batch_ref"] = next(iter(opcoes_lote.values()))
-
-    st.markdown("#### Selecionar lote")
-    lote_label = st.selectbox(
-        "Selecionar lote",
-        list(opcoes_lote.keys()),
-        index=list(opcoes_lote.values()).index(st.session_state["selected_batch_ref"])
-        if st.session_state["selected_batch_ref"] in opcoes_lote.values()
-        else 0,
-        help="Escolha um lote enviado para abrir, editar ou excluir.",
-        label_visibility="collapsed",
-    )
-    lote_ref = opcoes_lote[lote_label]
-    st.session_state["selected_batch_ref"] = lote_ref
-    lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
-    if "editing_batch_ref" not in st.session_state:
-        st.session_state["editing_batch_ref"] = None
-
-    a1, a2, a3 = st.columns(3)
-    with a1:
-        if st.button("Abrir lote", use_container_width=True):
-            st.session_state["opened_batch_ref"] = lote_ref
+        st.markdown("#### Selecionar lote")
+        lote_label = st.selectbox(
+            "Selecionar lote",
+            list(opcoes_lote.keys()),
+            index=list(opcoes_lote.values()).index(st.session_state["selected_batch_ref"])
+            if st.session_state["selected_batch_ref"] in opcoes_lote.values()
+            else 0,
+            help="Escolha um lote enviado para abrir o detalhe, editar o nome comercial ou excluir o histórico desse envio.",
+            label_visibility="collapsed",
+        )
+        lote_ref = opcoes_lote[lote_label]
+        st.session_state["selected_batch_ref"] = lote_ref
+        lote_atual = lotes_df[lotes_df["batch_ref"] == lote_ref].iloc[0]
+        if "editing_batch_ref" not in st.session_state:
             st.session_state["editing_batch_ref"] = None
-    with a2:
-        if st.button("Editar lote", use_container_width=True):
-            st.session_state["editing_batch_ref"] = lote_ref
-    with a3:
-        if st.button("Excluir lote", use_container_width=True, type="secondary"):
-            delete_batch(lote_ref)
-            st.success("Lote excluído do histórico.")
-            if st.session_state.get("opened_batch_ref") == lote_ref:
-                st.session_state["opened_batch_ref"] = None
-            if st.session_state.get("editing_batch_ref") == lote_ref:
-                st.session_state["editing_batch_ref"] = None
-            st.rerun()
 
-    if st.session_state.get("editing_batch_ref") == lote_ref:
-        st.markdown("#### Editar lote")
-        edit_col1, edit_col2 = st.columns([2, 1])
-        with edit_col1:
-            novo_nome = st.text_input(
-                "Novo nome do lote",
-                value=lote_atual["batch_name"],
-                key=f"rename_{lote_ref}",
-            )
-        with edit_col2:
-            st.write("")
-            st.write("")
-            if st.button("Salvar lote", use_container_width=True):
-                update_batch_name(lote_ref, novo_nome or lote_atual["batch_name"])
-                st.success("Nome do lote atualizado.")
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            if st.button("Abrir lote", use_container_width=True):
+                st.session_state["opened_batch_ref"] = lote_ref
                 st.session_state["editing_batch_ref"] = None
+        with a2:
+            editar_lote = st.button("Editar lote", use_container_width=True, disabled=not allowed_edit_lots)
+            if editar_lote and allowed_edit_lots:
+                st.session_state["editing_batch_ref"] = lote_ref
+        with a3:
+            excluir_lote = st.button("Excluir lote", use_container_width=True, type="secondary", disabled=not allowed_delete_lots)
+            if excluir_lote and allowed_delete_lots:
+                delete_batch(lote_ref)
+                st.success("Lote excluído do histórico.")
+                if st.session_state.get("opened_batch_ref") == lote_ref:
+                    st.session_state["opened_batch_ref"] = None
+                if st.session_state.get("editing_batch_ref") == lote_ref:
+                    st.session_state["editing_batch_ref"] = None
                 st.rerun()
 
-    if st.session_state.get("opened_batch_ref") == lote_ref:
-        docs_lote = load_batch_documents(lote_ref)
-        st.markdown("#### Detalhe do lote")
-        d1, d2, d3, d4 = st.columns(4)
-        render_batch_metric(d1, "XMLs", int(lote_atual["total_documentos"]))
-        render_batch_metric(d2, "Alertas", int(lote_atual["total_alertas"]))
-        render_batch_metric(d3, "Valor total", formatar_brl(float(lote_atual["valor_total"])))
-        render_batch_metric(d4, "Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
-        st.caption(
-            f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Referência: {lote_ref}'
-        )
-        if docs_lote.empty:
-            st.caption("Nenhum documento encontrado para este lote.")
-        else:
-            st.dataframe(
-                docs_lote[
-                    [
-                        "arquivo",
-                        "paciente",
-                        "prestador",
-                        "procedimento",
-                        "valor_nf",
-                        "score_final",
-                        "classificacao_final",
-                        "motivo_tecnico",
-                        "motivo_comportamental",
-                    ]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
+        if not allowed_edit_lots:
+            st.caption("O perfil atual pode consultar os lotes, mas apenas o acesso Master pode editar ou excluir.")
 
-uploaded_files = st.file_uploader(
-    copy["upload_label"],
-    type=["xml"],
-    accept_multiple_files=True,
-    help=copy["upload_help"],
-)
+        if st.session_state.get("editing_batch_ref") == lote_ref and allowed_edit_lots:
+            st.markdown("#### Editar lote")
+            edit_col1, edit_col2 = st.columns([2, 1])
+            with edit_col1:
+                novo_nome = st.text_input(
+                    "Novo nome do lote",
+                    value=lote_atual["batch_name"],
+                    key=f"rename_{lote_ref}",
+                )
+            with edit_col2:
+                st.write("")
+                st.write("")
+                if st.button("Salvar lote", use_container_width=True):
+                    update_batch_name(lote_ref, novo_nome or lote_atual["batch_name"])
+                    st.success("Nome do lote atualizado.")
+                    st.session_state["editing_batch_ref"] = None
+                    st.rerun()
+
+        if st.session_state.get("opened_batch_ref") == lote_ref:
+            docs_lote = load_batch_documents(lote_ref)
+            st.markdown("#### Detalhe do lote")
+            d1, d2, d3, d4 = st.columns(4)
+            render_batch_metric(d1, "XMLs", int(lote_atual["total_documentos"]))
+            render_batch_metric(d2, "Alertas", int(lote_atual["total_alertas"]))
+            render_batch_metric(d3, "Valor total", formatar_brl(float(lote_atual["valor_total"])))
+            render_batch_metric(d4, "Valor em alerta", formatar_brl(float(lote_atual["valor_alerta"])))
+            st.caption(
+                f'Segmento: {lote_atual["segment"]} | Enviado por: {lote_atual["uploaded_by"]} | Referência: {lote_ref}'
+            )
+            if docs_lote.empty:
+                st.caption("Nenhum documento encontrado para este lote.")
+            else:
+                st.dataframe(
+                    docs_lote[
+                        [
+                            "arquivo",
+                            "paciente",
+                            "prestador",
+                            "procedimento",
+                            "valor_nf",
+                            "score_final",
+                            "classificacao_final",
+                            "motivo_tecnico",
+                            "motivo_comportamental",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+else:
+    st.info("Seu perfil atual não tem acesso ao histórico de lotes.")
+
+if allowed_upload:
+    uploaded_files = st.file_uploader(
+        copy["upload_label"],
+        type=["xml"],
+        accept_multiple_files=True,
+        help=copy["upload_help"],
+    )
+else:
+    uploaded_files = []
+    st.info("O perfil Gerencial pode acompanhar lotes e indicadores, mas não realiza upload de XMLs.")
 
 if "analysis_df" not in st.session_state:
     st.session_state["analysis_df"] = pd.DataFrame()
@@ -3013,15 +3132,15 @@ if not df.empty:
     if st.button(
         "Registrar este lote no histórico",
         use_container_width=True,
-        disabled=st.session_state.get("auth_user") is None,
-        help="Disponível para usuários master autenticados.",
+        disabled=not allowed_save_history,
+        help="Disponível para perfis Master e Operacional.",
     ):
         try:
             salvos = salvar_lote_no_historico(
                 df,
                 origem,
                 segment=segmento,
-                uploaded_by=st.session_state["auth_user"]["username"],
+                uploaded_by=auth_user["username"],
             )
             st.success(f"{salvos} documento(s) foram gravados no histórico antifraude.")
             st.rerun()
