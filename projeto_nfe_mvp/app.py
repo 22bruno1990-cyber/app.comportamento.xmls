@@ -3313,18 +3313,22 @@ if allowed_view_lots:
         st.caption("Nenhum caso tratado ou salvo no período selecionado.")
     else:
         resumo_tratativa_geral = resumo_tratativa_lote(tratativa_df)
-        aba_painel, aba_rankings, aba_exportacoes = st.tabs(
-            ["Painel", "Rankings", "Exportações"]
+        visao_tratativa = st.segmented_control(
+            "Visão da tratativa",
+            options=["Painel", "Rankings", "Exportações"],
+            default="Painel",
+            selection_mode="single",
+            key="treatment_dashboard_view",
         )
 
-        with aba_painel:
+        if visao_tratativa == "Painel":
             gt1, gt2, gt3, gt4 = st.columns(4)
             render_batch_metric(gt1, "Novos", resumo_tratativa_geral["Novo"]["quantidade"], formatar_brl(resumo_tratativa_geral["Novo"]["valor"]))
             render_batch_metric(gt2, "Em análise", resumo_tratativa_geral["Em análise"]["quantidade"], formatar_brl(resumo_tratativa_geral["Em análise"]["valor"]))
             render_batch_metric(gt3, "Confirmados", resumo_tratativa_geral["Confirmado"]["quantidade"], formatar_brl(resumo_tratativa_geral["Confirmado"]["valor"]))
             render_batch_metric(gt4, "Descartados", resumo_tratativa_geral["Descartado"]["quantidade"], formatar_brl(resumo_tratativa_geral["Descartado"]["valor"]))
 
-        with aba_rankings:
+        elif visao_tratativa == "Rankings":
             g1, g2 = st.columns(2)
             with g1:
                 st.markdown("##### Prestadores com mais confirmações")
@@ -3349,7 +3353,7 @@ if allowed_view_lots:
                     top_revisores.name = "Tratativas"
                     st.dataframe(top_revisores, use_container_width=True)
 
-        with aba_exportacoes:
+        else:
             st.markdown("##### Exportação por status")
             export_cols = st.columns(4)
             status_slug = {
