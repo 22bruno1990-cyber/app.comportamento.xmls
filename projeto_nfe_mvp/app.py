@@ -3052,7 +3052,7 @@ with st.sidebar:
         f"""
         - documentos salvos: **{historico["total_documentos"]}**
         - hashes únicos: **{historico["hashes_unicos"]}**
-        - NFs distintas (ID NF-e): **{historico["ids_unicos"]}**
+        - NFs distintas no histórico: **{historico["ids_unicos"]}**
         - último lote processado: **{historico["ultima_analise"]}**
         """
     )
