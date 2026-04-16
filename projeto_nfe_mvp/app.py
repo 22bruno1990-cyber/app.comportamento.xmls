@@ -2903,11 +2903,12 @@ else:
         st.session_state["selected_batch_ref"] = next(iter(opcoes_lote.values()))
 
     lote_label = st.selectbox(
-        "Selecionar lote",
+        "Lotes enviados",
         list(opcoes_lote.keys()),
         index=list(opcoes_lote.values()).index(st.session_state["selected_batch_ref"])
         if st.session_state["selected_batch_ref"] in opcoes_lote.values()
         else 0,
+        help="Escolha um lote enviado para abrir, editar ou excluir.",
     )
     lote_ref = opcoes_lote[lote_label]
     st.session_state["selected_batch_ref"] = lote_ref
