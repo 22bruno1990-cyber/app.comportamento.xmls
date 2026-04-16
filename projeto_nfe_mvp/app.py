@@ -536,6 +536,37 @@ st.markdown(
     .login-stage .stTextInput {
         margin-bottom: 0.35rem !important;
     }
+
+    .login-stage .stRadio > div {
+        align-items: center !important;
+    }
+
+    .login-stage .stRadio [role="radiogroup"] {
+        justify-content: center !important;
+        gap: 1.4rem !important;
+    }
+
+    .login-stage .stRadio label {
+        justify-content: center !important;
+    }
+
+    .login-access-title {
+        text-align: center;
+        color: #eef5ff;
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        margin-bottom: 0.4rem;
+    }
+
+    .login-access-copy {
+        text-align: center;
+        color: #d8e6fb;
+        font-size: 0.95rem;
+        line-height: 1.45;
+        margin: 0.55rem auto 0.85rem auto;
+        max-width: 28rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -1311,18 +1342,23 @@ def render_login_cover():
         if bootstrap_users:
             available_roles = [role for role in ROLE_DEFINITIONS if any(normalize_role(user["role"]) == role for user in bootstrap_users)]
             role_options = [ROLE_DEFINITIONS[role]["label"] for role in available_roles]
+            st.markdown('<div class="login-access-title">Tipo de acesso</div>', unsafe_allow_html=True)
             selected_label = st.radio(
                 "Tipo de acesso",
                 role_options,
                 horizontal=True,
                 key="cover_access_label",
+                label_visibility="collapsed",
             )
             selected_role = next(
                 role_key
                 for role_key in available_roles
                 if ROLE_DEFINITIONS[role_key]["label"] == selected_label
             )
-            st.caption(ROLE_DEFINITIONS[selected_role]["description"])
+            st.markdown(
+                f'<div class="login-access-copy">{ROLE_DEFINITIONS[selected_role]["description"]}</div>',
+                unsafe_allow_html=True,
+            )
             with st.form("login_cover_form"):
                 username_input = st.text_input("Usuário", key="cover_username")
                 password_input = st.text_input("Senha", type="password", key="cover_password")
