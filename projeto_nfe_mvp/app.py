@@ -771,6 +771,13 @@ BATCH_STATUS_OPTIONS = [
     "Arquivado",
 ]
 
+CASE_STATUS_OPTIONS = [
+    "Novo",
+    "Em análise",
+    "Confirmado",
+    "Descartado",
+]
+
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
@@ -892,6 +899,10 @@ def can_delete_lots(user):
     return normalize_role(user.get("role")) == "master"
 
 
+def can_review_cases(user):
+    return normalize_role(user.get("role")) in {"master", "gerencial"}
+
+
 def get_bootstrap_users():
     secrets_map = {}
     try:
@@ -943,6 +954,28 @@ def ensure_upload_batches_schema(conn):
         conn.execute("ALTER TABLE upload_batches ADD COLUMN status TEXT DEFAULT 'Novo'")
     if "notes" not in existing_columns:
         conn.execute("ALTER TABLE upload_batches ADD COLUMN notes TEXT DEFAULT ''")
+
+
+def ensure_nfe_documents_schema(conn):
+    if is_postgres():
+        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS case_status TEXT DEFAULT 'Novo'")
+        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS analyst_note TEXT DEFAULT ''")
+        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS reviewed_by TEXT DEFAULT ''")
+        db_execute(conn, "ALTER TABLE nfe_documents ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP NULL")
+        return
+
+    existing_columns = {
+        row["name"] if isinstance(row, sqlite3.Row) else row[1]
+        for row in conn.execute("PRAGMA table_info(nfe_documents)").fetchall()
+    }
+    if "case_status" not in existing_columns:
+        conn.execute("ALTER TABLE nfe_documents ADD COLUMN case_status TEXT DEFAULT 'Novo'")
+    if "analyst_note" not in existing_columns:
+        conn.execute("ALTER TABLE nfe_documents ADD COLUMN analyst_note TEXT DEFAULT ''")
+    if "reviewed_by" not in existing_columns:
+        conn.execute("ALTER TABLE nfe_documents ADD COLUMN reviewed_by TEXT DEFAULT ''")
+    if "reviewed_at" not in existing_columns:
+        conn.execute("ALTER TABLE nfe_documents ADD COLUMN reviewed_at TEXT DEFAULT NULL")
 
 
 def inicializar_banco():
@@ -1029,6 +1062,7 @@ def inicializar_banco():
             ON nfe_documents(cpf_paciente, prestador, procedimento, data_atendimento)
             """,
         )
+        ensure_nfe_documents_schema(conn)
         if is_postgres():
             db_execute(
                 conn,
@@ -1295,6 +1329,7 @@ def load_batch_documents(batch_ref):
             conn,
             """
             SELECT
+                id,
                 arquivo,
                 paciente,
                 prestador,
@@ -1303,7 +1338,11 @@ def load_batch_documents(batch_ref):
                 valor_nf_num,
                 score_final,
                 classificacao_final,
-                analisado_em
+                analisado_em,
+                case_status,
+                analyst_note,
+                reviewed_by,
+                reviewed_at
             FROM nfe_documents
             WHERE origem_upload LIKE ?
             ORDER BY score_final DESC, valor_nf_num DESC, analisado_em DESC
@@ -1318,9 +1357,29 @@ def load_batch_documents(batch_ref):
             normalizados.append(dict(row))
     df = pd.DataFrame(normalizados)
     if not df.empty:
+        df["case_status"] = df["case_status"].fillna("Novo").replace("", "Novo")
+        df["analyst_note"] = df["analyst_note"].fillna("")
+        df["reviewed_by"] = df["reviewed_by"].fillna("")
+        df["reviewed_at"] = df["reviewed_at"].fillna("")
         df["motivo_tecnico"] = "Disponível no detalhe da análise original"
         df["motivo_comportamental"] = "Disponível no detalhe da análise original"
     return df
+
+
+def update_case_review(document_id, case_status, analyst_note, reviewed_by):
+    inicializar_banco()
+    reviewed_at = datetime.now().isoformat(sep=" ", timespec="seconds")
+    with get_db_connection() as conn:
+        db_execute(
+            conn,
+            """
+            UPDATE nfe_documents
+            SET case_status = ?, analyst_note = ?, reviewed_by = ?, reviewed_at = ?
+            WHERE id = ?
+            """,
+            (case_status, (analyst_note or "").strip(), reviewed_by, reviewed_at, int(document_id)),
+        )
+        conn.commit()
 
 
 def update_batch_metadata(batch_ref, new_name, status, notes):
@@ -3059,6 +3118,7 @@ allowed_save_history = can_save_history(auth_user)
 allowed_view_lots = can_view_lots(auth_user)
 allowed_edit_lots = can_edit_lots(auth_user)
 allowed_delete_lots = can_delete_lots(auth_user)
+allowed_review_cases = can_review_cases(auth_user)
 
 with st.sidebar:
     historico = load_history_stats()
@@ -3294,6 +3354,44 @@ if allowed_view_lots:
                     mime="text/csv",
                     use_container_width=False,
                 )
+                if allowed_review_cases:
+                    st.markdown("#### Tratativa do caso")
+                    opcoes_caso = {
+                        f'{row["arquivo"]} · {row["classificacao_final"]} · {row["valor_nf"]}': int(row["id"])
+                        for _, row in docs_lote.iterrows()
+                    }
+                    caso_label = st.selectbox(
+                        "Selecionar caso do lote",
+                        list(opcoes_caso.keys()),
+                        help="Escolha um documento do lote para registrar o andamento da análise.",
+                    )
+                    caso_id = opcoes_caso[caso_label]
+                    caso_atual = docs_lote[docs_lote["id"] == caso_id].iloc[0]
+                    review_col1, review_col2 = st.columns([1, 2])
+                    with review_col1:
+                        novo_case_status = st.selectbox(
+                            "Status do caso",
+                            CASE_STATUS_OPTIONS,
+                            index=CASE_STATUS_OPTIONS.index(caso_atual["case_status"]) if caso_atual["case_status"] in CASE_STATUS_OPTIONS else 0,
+                            key=f"case_status_{caso_id}",
+                        )
+                    with review_col2:
+                        nova_case_note = st.text_area(
+                            "Observação do analista",
+                            value=caso_atual["analyst_note"] or "",
+                            key=f"case_note_{caso_id}",
+                            height=90,
+                        )
+                    if st.button("Salvar tratativa", key=f"save_case_{caso_id}", use_container_width=False):
+                        update_case_review(caso_id, novo_case_status, nova_case_note, auth_user["username"])
+                        st.success("Tratativa do caso atualizada.")
+                        st.rerun()
+                    if (caso_atual.get("reviewed_by") or "").strip():
+                        st.caption(
+                            f'Última revisão: {caso_atual["reviewed_by"]} em {caso_atual["reviewed_at"] or "data não registrada"}'
+                        )
+                else:
+                    st.caption("O perfil atual pode consultar os casos do lote, mas a tratativa analítica fica disponível para perfis Gerencial e Master.")
                 st.dataframe(
                     docs_lote[
                         [
@@ -3304,6 +3402,8 @@ if allowed_view_lots:
                             "valor_nf",
                             "score_final",
                             "classificacao_final",
+                            "case_status",
+                            "reviewed_by",
                             "motivo_tecnico",
                             "motivo_comportamental",
                         ]
