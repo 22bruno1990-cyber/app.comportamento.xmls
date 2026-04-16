@@ -3411,6 +3411,14 @@ if allowed_view_lots:
                     use_container_width=True,
                     hide_index=True,
                 )
+                st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+                footer_col1, footer_col2 = st.columns([1, 3])
+                with footer_col1:
+                    if st.button("Fechar lote", key=f"close_batch_{lote_ref}", use_container_width=True):
+                        st.session_state["opened_batch_ref"] = None
+                        st.session_state["editing_batch_ref"] = None
+                        st.success("Detalhe do lote fechado.")
+                        st.rerun()
 else:
     st.info("Seu perfil atual não tem acesso ao histórico de lotes.")
 
