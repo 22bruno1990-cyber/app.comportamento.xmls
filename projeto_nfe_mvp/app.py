@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import base64
 import hashlib
 import hmac
@@ -1190,17 +1190,29 @@ def registrar_lote_upload(df, origem_upload, segment, uploaded_by):
     return batch_ref
 
 
-def load_batch_history(limit=12):
+def load_batch_history(limit=None, start_date=None, end_date=None):
     inicializar_banco()
+    filters = []
+    params = []
+    if start_date:
+        filters.append("created_at >= ?")
+        params.append(f"{start_date} 00:00:00")
+    if end_date:
+        filters.append("created_at <= ?")
+        params.append(f"{end_date} 23:59:59")
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+    limit_clause = f"LIMIT {int(limit)}" if limit else ""
     with get_db_connection() as conn:
         rows = db_fetchall(
             conn,
             f"""
             SELECT batch_ref, batch_name, segment, uploaded_by, total_documentos, total_alertas, created_at
             FROM upload_batches
+            {where_clause}
             ORDER BY created_at DESC
-            LIMIT {int(limit)}
+            {limit_clause}
             """,
+            tuple(params) if params else None,
         )
     normalizados = []
     for row in rows:
@@ -2495,6 +2507,23 @@ def formatar_brl(valor):
     return f"R$ {texto}"
 
 
+def resolver_periodo_lotes(filtro_periodo, data_inicial=None, data_final=None):
+    hoje = date.today()
+    if filtro_periodo == "Últimos 10 dias":
+        return hoje - timedelta(days=10), hoje
+    if filtro_periodo == "Últimos 30 dias":
+        return hoje - timedelta(days=30), hoje
+    if filtro_periodo == "Últimos 60 dias":
+        return hoje - timedelta(days=60), hoje
+    if filtro_periodo == "Últimos 90 dias":
+        return hoje - timedelta(days=90), hoje
+    if filtro_periodo == "Mês atual":
+        return hoje.replace(day=1), hoje
+    if filtro_periodo == "Personalizado":
+        return data_inicial, data_final
+    return None, None
+
+
 def categoria_trilha_risco(classificacao):
     if classificacao == "REAPRESENTACAO":
         return "FRAUDE FORTE"
@@ -3032,9 +3061,42 @@ render_hero(copy)
 render_pitch(copy)
 if allowed_view_lots:
     st.markdown("### Histórico de lotes")
-    lotes_df = load_batch_history()
+    filtro_col1, filtro_col2, filtro_col3 = st.columns([1.4, 1, 1])
+    with filtro_col1:
+        filtro_periodo = st.selectbox(
+            "Período dos lotes",
+            [
+                "Últimos lançamentos",
+                "Últimos 10 dias",
+                "Últimos 30 dias",
+                "Últimos 60 dias",
+                "Últimos 90 dias",
+                "Mês atual",
+                "Personalizado",
+            ],
+            index=0,
+            help="Filtre o histórico por janela de tempo para localizar os lotes enviados.",
+        )
+    data_inicial = None
+    data_final = None
+    if filtro_periodo == "Personalizado":
+        with filtro_col2:
+            data_inicial = st.date_input(
+                "Data inicial",
+                value=date.today().replace(day=1),
+                format="DD/MM/YYYY",
+            )
+        with filtro_col3:
+            data_final = st.date_input(
+                "Data final",
+                value=date.today(),
+                format="DD/MM/YYYY",
+            )
+    start_date, end_date = resolver_periodo_lotes(filtro_periodo, data_inicial, data_final)
+    limite_lotes = 12 if filtro_periodo == "Últimos lançamentos" else None
+    lotes_df = load_batch_history(limit=limite_lotes, start_date=start_date, end_date=end_date)
     if lotes_df.empty:
-        st.caption("Nenhum lote registrado ainda.")
+        st.caption("Nenhum lote encontrado para o período selecionado.")
     else:
         lotes_exibicao = lotes_df.copy()
         lotes_exibicao["valor_total"] = lotes_exibicao["valor_total"].apply(formatar_brl)
@@ -3133,6 +3195,14 @@ if allowed_view_lots:
             if docs_lote.empty:
                 st.caption("Nenhum documento encontrado para este lote.")
             else:
+                csv_lote = docs_lote.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    "Exportar CSV do lote",
+                    data=csv_lote,
+                    file_name=f"{lote_atual['batch_name']}_detalhe_lote.csv".replace(" ", "_"),
+                    mime="text/csv",
+                    use_container_width=False,
+                )
                 st.dataframe(
                     docs_lote[
                         [
