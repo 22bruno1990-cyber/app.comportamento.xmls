@@ -551,20 +551,23 @@ st.markdown(
         max-width: 34rem;
     }
 
-    .login-access-row .stColumn {
-        display: flex;
-        align-items: stretch;
+    .login-access-row [data-testid="stSegmentedControl"] {
+        justify-content: center !important;
     }
 
-    .login-access-row .stButton {
-        width: 100%;
+    .login-access-row [data-baseweb="button-group"] {
+        background: rgba(8, 18, 42, 0.32) !important;
+        border: 1px solid rgba(173, 205, 245, 0.18) !important;
+        border-radius: 999px !important;
+        padding: 0.2rem !important;
+        gap: 0.2rem !important;
     }
 
-    .login-access-row .stButton > button {
-        min-height: 42px !important;
-        font-size: 0.98rem !important;
+    .login-access-row button[kind="segmented_control_option"] {
+        min-height: 40px !important;
+        border-radius: 999px !important;
         font-weight: 800 !important;
-        white-space: nowrap !important;
+        color: #e8f2ff !important;
     }
 
     .login-access-copy {
@@ -1353,18 +1356,21 @@ def render_login_cover():
                 st.session_state["cover_access_role"] = available_roles[0]
             st.markdown('<div class="login-access-title">Tipo de acesso</div>', unsafe_allow_html=True)
             st.markdown('<div class="login-access-row">', unsafe_allow_html=True)
-            role_cols = st.columns(len(available_roles))
-            for idx, role_key in enumerate(available_roles):
-                with role_cols[idx]:
-                    if st.button(
-                        ROLE_DEFINITIONS[role_key]["label"],
-                        key=f"access_role_{role_key}",
-                        use_container_width=True,
-                        type="primary" if st.session_state["cover_access_role"] == role_key else "secondary",
-                    ):
-                        st.session_state["cover_access_role"] = role_key
+            selected_label = st.segmented_control(
+                "Tipo de acesso",
+                options=[ROLE_DEFINITIONS[role]["label"] for role in available_roles],
+                default=ROLE_DEFINITIONS[st.session_state["cover_access_role"]]["label"],
+                selection_mode="single",
+                key="cover_access_segmented",
+                label_visibility="collapsed",
+            )
             st.markdown('</div>', unsafe_allow_html=True)
-            selected_role = st.session_state["cover_access_role"]
+            selected_role = next(
+                role_key
+                for role_key in available_roles
+                if ROLE_DEFINITIONS[role_key]["label"] == selected_label
+            )
+            st.session_state["cover_access_role"] = selected_role
             st.markdown(
                 f'<div class="login-access-copy">{ROLE_DEFINITIONS[selected_role]["description"]}</div>',
                 unsafe_allow_html=True,
