@@ -3398,24 +3398,26 @@ if allowed_view_lots:
                         help="Escolha o caso para registrar a tratativa analítica.",
                         key="global_case_selector",
                     )
-                    caso_atual = tratativa_df_exibicao.loc[opcoes_caso[caso_label]]
+                    caso_ref = opcoes_caso[caso_label]
+                    caso_atual = tratativa_df_exibicao.loc[caso_ref]
+                    caso_id = int(caso_atual["id"]) if "id" in caso_atual.index else int(caso_ref)
                     review_col1, review_col2 = st.columns([1, 2])
                     with review_col1:
                         novo_case_status = st.selectbox(
                             "Status do caso",
                             available_case_statuses,
                             index=available_case_statuses.index(caso_atual["case_status"]) if caso_atual["case_status"] in available_case_statuses else 0,
-                            key=f'global_case_status_{caso_atual["id"]}',
+                            key=f"global_case_status_{caso_id}",
                         )
                     with review_col2:
                         nova_case_note = st.text_area(
                             "Observação do analista",
                             value=caso_atual["analyst_note"] or "",
-                            key=f'global_case_note_{caso_atual["id"]}',
+                            key=f"global_case_note_{caso_id}",
                             height=90,
                         )
-                    if st.button("Salvar tratativa", key=f'global_save_case_{caso_atual["id"]}', use_container_width=False):
-                        update_case_review(caso_atual["id"], novo_case_status, nova_case_note, auth_user["username"])
+                    if st.button("Salvar tratativa", key=f"global_save_case_{caso_id}", use_container_width=False):
+                        update_case_review(caso_id, novo_case_status, nova_case_note, auth_user["username"])
                         st.success("Tratativa do caso atualizada.")
                         st.rerun()
                     if (caso_atual.get("reviewed_by") or "").strip():
