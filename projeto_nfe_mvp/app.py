@@ -1247,6 +1247,12 @@ def ensure_app_users_schema(conn):
             db_execute(conn, "ALTER TABLE app_users ADD COLUMN created_by TEXT DEFAULT ''")
         if "parent_username" not in existing_columns:
             db_execute(conn, "ALTER TABLE app_users ADD COLUMN parent_username TEXT DEFAULT ''")
+        if "must_change_password" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE")
+        if "password_updated_at" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN password_updated_at TIMESTAMP NULL")
+        if "last_login_at" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN last_login_at TIMESTAMP NULL")
         return
 
     existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(app_users)").fetchall()}
@@ -1256,7 +1262,12 @@ def ensure_app_users_schema(conn):
         conn.execute("ALTER TABLE app_users ADD COLUMN created_by TEXT DEFAULT ''")
     if "parent_username" not in existing_columns:
         conn.execute("ALTER TABLE app_users ADD COLUMN parent_username TEXT DEFAULT ''")
-    bootstrap_admin_user()
+    if "must_change_password" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0")
+    if "password_updated_at" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN password_updated_at TEXT DEFAULT NULL")
+    if "last_login_at" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN last_login_at TEXT DEFAULT NULL")
 
 
 def bootstrap_admin_user():
@@ -1279,15 +1290,23 @@ def bootstrap_admin_user():
                 ):
                     db_execute(
                         conn,
-                        "UPDATE app_users SET password_hash = ?, role = ?, active = TRUE, created_by = ?, parent_username = ? WHERE username = ?",
+                        """
+                        UPDATE app_users
+                        SET password_hash = ?, role = ?, active = TRUE, created_by = ?, parent_username = ?,
+                            must_change_password = FALSE, password_updated_at = CURRENT_TIMESTAMP
+                        WHERE username = ?
+                        """,
                         (hash_password(user["password"]), desired_role, "bootstrap", "", user["username"]),
                     )
                 continue
             db_execute(
                 conn,
                 """
-                INSERT INTO app_users (username, full_name, password_hash, role, created_by, parent_username, active)
-                VALUES (?, ?, ?, ?, ?, ?, TRUE)
+                INSERT INTO app_users (
+                    username, full_name, password_hash, role, created_by, parent_username,
+                    active, must_change_password, password_updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, TRUE, FALSE, CURRENT_TIMESTAMP)
                 """,
                 (user["username"], user["username"], hash_password(user["password"]), desired_role, "bootstrap", ""),
             )
@@ -1325,7 +1344,8 @@ def authenticate_user(username, password, required_role=None):
         user = db_fetchone(
             conn,
             """
-            SELECT username, full_name, password_hash, role, active, created_by, parent_username
+            SELECT username, full_name, password_hash, role, active, created_by, parent_username,
+                   must_change_password, password_updated_at, last_login_at
             FROM app_users
             WHERE username = ?
             """,
@@ -1341,12 +1361,20 @@ def authenticate_user(username, password, required_role=None):
     normalized_role = normalize_role(user["role"])
     if required_role and normalized_role != normalize_role(required_role):
         return None
+    with get_db_connection() as conn:
+        db_execute(
+            conn,
+            "UPDATE app_users SET last_login_at = CURRENT_TIMESTAMP WHERE username = ?",
+            (user["username"],),
+        )
+        conn.commit()
     return {
         "username": user["username"],
         "full_name": user.get("full_name") or user["username"],
         "role": normalized_role,
         "created_by": user.get("created_by") or "",
         "parent_username": user.get("parent_username") or "",
+        "must_change_password": bool(user.get("must_change_password")),
     }
 
 
@@ -1416,8 +1444,11 @@ def create_managed_user(current_user, username, password, role, full_name=""):
         db_execute(
             conn,
             """
-            INSERT INTO app_users (username, full_name, password_hash, role, created_by, parent_username, active)
-            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+            INSERT INTO app_users (
+                username, full_name, password_hash, role, created_by, parent_username,
+                active, must_change_password
+            )
+            VALUES (?, ?, ?, ?, ?, ?, TRUE, TRUE)
             """,
             (
                 username_clean,
@@ -1462,6 +1493,23 @@ def update_user_active_status(current_user, target_username, active):
             conn,
             "UPDATE app_users SET active = ? WHERE username = ?",
             (bool(active), target_username),
+        )
+        conn.commit()
+
+
+def update_user_password(username, new_password):
+    if len(new_password or "") < 6:
+        raise ValueError("a nova senha precisa ter pelo menos 6 caracteres")
+    inicializar_banco()
+    with get_db_connection() as conn:
+        db_execute(
+            conn,
+            """
+            UPDATE app_users
+            SET password_hash = ?, must_change_password = FALSE, password_updated_at = CURRENT_TIMESTAMP
+            WHERE username = ?
+            """,
+            (hash_password(new_password), username),
         )
         conn.commit()
 
@@ -3477,6 +3525,35 @@ if not st.session_state["auth_user"]:
     st.stop()
 
 auth_user = st.session_state["auth_user"]
+if auth_user.get("must_change_password"):
+    render_hero(
+        {
+            "hero_title": "Defina sua nova senha para continuar",
+            "hero_text": "No primeiro acesso, a senha temporária precisa ser substituída por uma senha forte e pessoal.",
+            "pill_4": "Primeiro acesso",
+        }
+    )
+    st.markdown("### Atualizar senha de acesso")
+    st.caption("Use a senha temporária apenas uma vez. Depois disso, ela deixa de valer.")
+    with st.form("first_access_password_form"):
+        nova_senha = st.text_input("Nova senha", type="password")
+        confirmar_senha = st.text_input("Confirmar nova senha", type="password")
+        salvar_primeiro_acesso = st.form_submit_button("Salvar nova senha", use_container_width=True)
+    if salvar_primeiro_acesso:
+        if not nova_senha or not confirmar_senha:
+            st.error("Preencha os dois campos de senha.")
+        elif nova_senha != confirmar_senha:
+            st.error("As senhas não conferem.")
+        else:
+            try:
+                update_user_password(auth_user["username"], nova_senha)
+                st.session_state["auth_user"]["must_change_password"] = False
+                st.success("Senha atualizada com sucesso. O acesso já está liberado.")
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+    st.stop()
+
 auth_role = normalize_role(auth_user["role"])
 auth_role_label = role_label(auth_role)
 allowed_upload = can_upload(auth_user)
@@ -3496,6 +3573,22 @@ with st.sidebar:
         f'Conectado como **{auth_user["username"]}** ({auth_role_label})'
     )
     st.caption(ROLE_DEFINITIONS[auth_role]["description"])
+    with st.expander("Alterar minha senha"):
+        with st.form("change_password_sidebar_form"):
+            nova_senha_usuario = st.text_input("Nova senha", type="password", key="sidebar_new_password")
+            confirmar_nova_senha_usuario = st.text_input("Confirmar nova senha", type="password", key="sidebar_confirm_password")
+            salvar_nova_senha_usuario = st.form_submit_button("Atualizar senha", use_container_width=True)
+        if salvar_nova_senha_usuario:
+            if not nova_senha_usuario or not confirmar_nova_senha_usuario:
+                st.error("Preencha os dois campos para atualizar a senha.")
+            elif nova_senha_usuario != confirmar_nova_senha_usuario:
+                st.error("As senhas não conferem.")
+            else:
+                try:
+                    update_user_password(auth_user["username"], nova_senha_usuario)
+                    st.success("Senha atualizada com sucesso.")
+                except ValueError as exc:
+                    st.error(str(exc))
     if st.button("Encerrar sessão", use_container_width=True):
         st.session_state["auth_user"] = None
         st.rerun()
