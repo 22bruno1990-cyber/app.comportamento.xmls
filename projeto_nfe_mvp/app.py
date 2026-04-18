@@ -1480,6 +1480,45 @@ def render_batch_metric(col, label, value, sub=None):
     )
 
 
+def render_rank_card(col, title, rows, empty_message, value_label):
+    if not rows:
+        body = f'<div class="section-copy" style="margin-top:8px;">{empty_message}</div>'
+    else:
+        items = "".join(
+            f"""
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-top:{'1px solid rgba(21,43,76,0.08)' if idx > 0 else 'none'};">
+                <div style="font-size:0.96rem; color:#203754; font-weight:700; line-height:1.4;">{nome}</div>
+                <div style="font-size:0.92rem; color:#5b6d84; font-weight:800; white-space:nowrap;">{valor} {value_label}</div>
+            </div>
+            """
+            for idx, (nome, valor) in enumerate(rows)
+        )
+        body = f'<div style="margin-top:6px;">{items}</div>'
+
+    col.markdown(
+        f"""
+        <div class="glass-card" style="padding:18px 20px; min-height:250px;">
+            <div class="section-title" style="font-size:1rem; margin-bottom:8px;">{title}</div>
+            {body}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_export_status_card(col, status, quantidade):
+    col.markdown(
+        f"""
+        <div class="glass-card" style="padding:14px 16px; min-height:112px; margin-bottom:10px;">
+            <div class="section-title" style="font-size:0.95rem; margin-bottom:8px;">{status}</div>
+            <div style="font-size:1.8rem; font-weight:800; color:#152b4c; line-height:1;">{quantidade}</div>
+            <div class="section-copy" style="margin-top:10px;">casos disponíveis para exportação</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_login_cover():
     logo_base64 = image_to_base64(LOGIN_LOGO_PATH)
     st.markdown(
@@ -3439,28 +3478,26 @@ if allowed_view_lots:
             st.caption("Nenhum caso tratado ou salvo no período selecionado.")
         else:
             g1, g2 = st.columns(2)
-            with g1:
-                st.markdown("##### Prestadores com mais confirmações")
-                top_confirmados = (
-                    tratativa_df[tratativa_df["case_status"] == "Confirmado"]["prestador"]
-                    .value_counts()
-                    .head(5)
-                )
-                if top_confirmados.empty:
-                    st.caption("Nenhum caso confirmado no período.")
-                else:
-                    top_confirmados.index.name = "Prestador"
-                    top_confirmados.name = "Casos confirmados"
-                    st.dataframe(top_confirmados, use_container_width=True)
-            with g2:
-                st.markdown("##### Revisores mais ativos")
-                top_revisores = tratativa_df["reviewed_by"].value_counts().head(5)
-                if top_revisores.empty:
-                    st.caption("Nenhuma revisão registrada no período.")
-                else:
-                    top_revisores.index.name = "Revisor"
-                    top_revisores.name = "Tratativas"
-                    st.dataframe(top_revisores, use_container_width=True)
+            top_confirmados = (
+                tratativa_df[tratativa_df["case_status"] == "Confirmado"]["prestador"]
+                .value_counts()
+                .head(5)
+            )
+            top_revisores = tratativa_df["reviewed_by"].value_counts().head(5)
+            render_rank_card(
+                g1,
+                "Prestadores com mais confirmações",
+                list(top_confirmados.items()),
+                "Nenhum caso confirmado no período.",
+                "confirmações",
+            )
+            render_rank_card(
+                g2,
+                "Revisores mais ativos",
+                list(top_revisores.items()),
+                "Nenhuma revisão registrada no período.",
+                "tratativas",
+            )
             st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
 
     elif area_operacional == "Exportações":
@@ -3482,6 +3519,7 @@ if allowed_view_lots:
                 if idx % 3 == 0:
                     export_cols = st.columns(3)
                 with export_cols[idx % 3]:
+                    render_export_status_card(st, status, len(dados_status))
                     st.download_button(
                         f"Exportar {status}",
                         data=dados_status.to_csv(index=False).encode("utf-8-sig"),
