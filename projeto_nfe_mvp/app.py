@@ -785,6 +785,12 @@ POSTGRES_SCHEMA_READY = {
     "upload_batches": False,
 }
 
+USER_MANAGEMENT_RULES = {
+    "master": ["gerencial"],
+    "gerencial": ["operacional"],
+    "operacional": [],
+}
+
 
 def gerar_hash(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
@@ -886,6 +892,14 @@ def role_label(role):
     return ROLE_DEFINITIONS.get(normalize_role(role), ROLE_DEFINITIONS["operacional"])["label"]
 
 
+def can_manage_users(user):
+    return normalize_role(user.get("role")) in {"master", "gerencial"}
+
+
+def get_manageable_roles(user):
+    return USER_MANAGEMENT_RULES.get(normalize_role(user.get("role")), [])
+
+
 def can_upload(user):
     return normalize_role(user.get("role")) in {"master", "operacional"}
 
@@ -964,6 +978,38 @@ def get_bootstrap_users():
         seen.add(key)
         deduped.append(user)
     return deduped
+
+
+def load_available_login_roles():
+    inicializar_banco()
+    try:
+        with get_db_connection() as conn:
+            rows = db_fetchall(
+                conn,
+                """
+                SELECT DISTINCT role
+                FROM app_users
+                WHERE active = TRUE
+                ORDER BY role
+                """,
+            )
+        roles = []
+        for row in rows:
+            value = row["role"] if isinstance(row, dict) else row[0]
+            normalized = normalize_role(value)
+            if normalized in ROLE_DEFINITIONS and normalized not in roles:
+                roles.append(normalized)
+        if roles:
+            return roles
+    except Exception:
+        pass
+
+    bootstrap_users = get_bootstrap_users()
+    return [
+        role
+        for role in ROLE_DEFINITIONS
+        if any(normalize_role(user["role"]) == role for user in bootstrap_users)
+    ]
 
 
 def postgres_existing_columns(conn, table_name):
@@ -1124,8 +1170,11 @@ def inicializar_banco():
                 CREATE TABLE IF NOT EXISTS app_users (
                     id BIGSERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
+                    full_name TEXT DEFAULT '',
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL DEFAULT 'master',
+                    created_by TEXT DEFAULT '',
+                    parent_username TEXT DEFAULT '',
                     active BOOLEAN NOT NULL DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -1156,8 +1205,11 @@ def inicializar_banco():
                 CREATE TABLE IF NOT EXISTS app_users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
+                    full_name TEXT DEFAULT '',
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL DEFAULT 'master',
+                    created_by TEXT DEFAULT '',
+                    parent_username TEXT DEFAULT '',
                     active INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
@@ -1181,8 +1233,29 @@ def inicializar_banco():
                 )
                 """,
             )
+        ensure_app_users_schema(conn)
         ensure_upload_batches_schema(conn)
         conn.commit()
+
+
+def ensure_app_users_schema(conn):
+    if is_postgres():
+        existing_columns = postgres_existing_columns(conn, "app_users")
+        if "full_name" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN full_name TEXT DEFAULT ''")
+        if "created_by" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN created_by TEXT DEFAULT ''")
+        if "parent_username" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN parent_username TEXT DEFAULT ''")
+        return
+
+    existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(app_users)").fetchall()}
+    if "full_name" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN full_name TEXT DEFAULT ''")
+    if "created_by" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN created_by TEXT DEFAULT ''")
+    if "parent_username" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN parent_username TEXT DEFAULT ''")
     bootstrap_admin_user()
 
 
@@ -1206,17 +1279,17 @@ def bootstrap_admin_user():
                 ):
                     db_execute(
                         conn,
-                        "UPDATE app_users SET password_hash = ?, role = ?, active = TRUE WHERE username = ?",
-                        (hash_password(user["password"]), desired_role, user["username"]),
+                        "UPDATE app_users SET password_hash = ?, role = ?, active = TRUE, created_by = ?, parent_username = ? WHERE username = ?",
+                        (hash_password(user["password"]), desired_role, "bootstrap", "", user["username"]),
                     )
                 continue
             db_execute(
                 conn,
                 """
-                INSERT INTO app_users (username, password_hash, role, active)
-                VALUES (?, ?, ?, TRUE)
+                INSERT INTO app_users (username, full_name, password_hash, role, created_by, parent_username, active)
+                VALUES (?, ?, ?, ?, ?, ?, TRUE)
                 """,
-                (user["username"], hash_password(user["password"]), desired_role),
+                (user["username"], user["username"], hash_password(user["password"]), desired_role, "bootstrap", ""),
             )
         conn.commit()
 
@@ -1252,7 +1325,7 @@ def authenticate_user(username, password, required_role=None):
         user = db_fetchone(
             conn,
             """
-            SELECT username, password_hash, role, active
+            SELECT username, full_name, password_hash, role, active, created_by, parent_username
             FROM app_users
             WHERE username = ?
             """,
@@ -1268,7 +1341,128 @@ def authenticate_user(username, password, required_role=None):
     normalized_role = normalize_role(user["role"])
     if required_role and normalized_role != normalize_role(required_role):
         return None
-    return {"username": user["username"], "role": normalized_role}
+    return {
+        "username": user["username"],
+        "full_name": user.get("full_name") or user["username"],
+        "role": normalized_role,
+        "created_by": user.get("created_by") or "",
+        "parent_username": user.get("parent_username") or "",
+    }
+
+
+def load_managed_users(current_user):
+    inicializar_banco()
+    role = normalize_role(current_user.get("role"))
+    with get_db_connection() as conn:
+        if role == "master":
+            rows = db_fetchall(
+                conn,
+                """
+                SELECT username, full_name, role, active, created_by, parent_username, created_at
+                FROM app_users
+                WHERE role <> 'master'
+                ORDER BY role, username
+                """,
+            )
+        elif role == "gerencial":
+            rows = db_fetchall(
+                conn,
+                """
+                SELECT username, full_name, role, active, created_by, parent_username, created_at
+                FROM app_users
+                WHERE role = 'operacional' AND parent_username = ?
+                ORDER BY username
+                """,
+                (current_user["username"],),
+            )
+        else:
+            rows = []
+
+    normalizados = []
+    for row in rows:
+        normalizados.append(dict(row) if not isinstance(row, dict) else row)
+    df = pd.DataFrame(normalizados)
+    if df.empty:
+        return df
+    df["role"] = df["role"].apply(normalize_role)
+    df["perfil"] = df["role"].apply(role_label)
+    df["status_acesso"] = df["active"].apply(lambda valor: "Ativo" if bool(valor) else "Inativo")
+    df["nome_exibicao"] = df["full_name"].fillna("").replace("", df["username"])
+    return df
+
+
+def create_managed_user(current_user, username, password, role, full_name=""):
+    desired_role = normalize_role(role)
+    allowed_roles = get_manageable_roles(current_user)
+    if desired_role not in allowed_roles:
+        raise ValueError("perfil não permitido para a alçada atual")
+
+    username_clean = normalizar_texto(username).replace(" ", ".")
+    username_clean = re.sub(r"[^a-z0-9._-]", "", username_clean)
+    if not username_clean:
+        raise ValueError("informe um usuário válido")
+    if len(password or "") < 6:
+        raise ValueError("a senha precisa ter pelo menos 6 caracteres")
+
+    with get_db_connection() as conn:
+        existing = db_fetchone(
+            conn,
+            "SELECT username FROM app_users WHERE lower(username) = ?",
+            (username_clean.lower(),),
+        )
+        if existing:
+            raise ValueError("esse usuário já existe")
+        db_execute(
+            conn,
+            """
+            INSERT INTO app_users (username, full_name, password_hash, role, created_by, parent_username, active)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+            """,
+            (
+                username_clean,
+                (full_name or username_clean).strip(),
+                hash_password(password),
+                desired_role,
+                current_user["username"],
+                current_user["username"],
+            ),
+        )
+        conn.commit()
+
+
+def can_manage_target_user(current_user, target_user):
+    current_role = normalize_role(current_user.get("role"))
+    target_role = normalize_role(target_user.get("role"))
+    if current_role == "master":
+        return target_role != "master"
+    if current_role == "gerencial":
+        return target_role == "operacional" and (target_user.get("parent_username") or "") == current_user["username"]
+    return False
+
+
+def update_user_active_status(current_user, target_username, active):
+    inicializar_banco()
+    with get_db_connection() as conn:
+        target = db_fetchone(
+            conn,
+            """
+            SELECT username, role, parent_username
+            FROM app_users
+            WHERE username = ?
+            """,
+            (target_username,),
+        )
+        if not target:
+            raise ValueError("usuário não encontrado")
+        target_dict = dict(target) if not isinstance(target, dict) else target
+        if not can_manage_target_user(current_user, target_dict):
+            raise ValueError("você não tem permissão para alterar esse usuário")
+        db_execute(
+            conn,
+            "UPDATE app_users SET active = ? WHERE username = ?",
+            (bool(active), target_username),
+        )
+        conn.commit()
 
 
 def registrar_lote_upload(df, origem_upload, segment, uploaded_by):
@@ -1556,9 +1750,8 @@ def render_login_cover():
     st.markdown('<div style="height: 22vh;"></div>', unsafe_allow_html=True)
     _, center_col, _ = st.columns([1.6, 1, 1.6])
     with center_col:
-        bootstrap_users = get_bootstrap_users()
-        if bootstrap_users:
-            available_roles = [role for role in ROLE_DEFINITIONS if any(normalize_role(user["role"]) == role for user in bootstrap_users)]
+        available_roles = load_available_login_roles()
+        if available_roles:
             if "cover_access_role" not in st.session_state or st.session_state["cover_access_role"] not in available_roles:
                 st.session_state["cover_access_role"] = available_roles[0]
             st.markdown('<div class="login-access-title">Tipo de acesso</div>', unsafe_allow_html=True)
@@ -1599,8 +1792,8 @@ def render_login_cover():
             )
         else:
             st.warning(
-                "Faltam credenciais no Secrets para liberar o acesso autenticado. "
-                "Use `MASTER_`, `GERENCIAL_` e `OPERACIONAL_` ou mantenha `ADMIN_` para o perfil master."
+                "Ainda não existem perfis ativos para login. "
+                "Mantenha um usuário master nos `Secrets` para o bootstrap inicial e depois gerencie os acessos pelo próprio sistema."
             )
 
 
@@ -3291,6 +3484,7 @@ allowed_view_lots = can_view_lots(auth_user)
 allowed_edit_lots = can_edit_lots(auth_user)
 allowed_delete_lots = can_delete_lots(auth_user)
 allowed_review_cases = can_review_cases(auth_user)
+allowed_manage_users = can_manage_users(auth_user)
 
 with st.sidebar:
     historico = load_history_stats()
@@ -3373,10 +3567,13 @@ if allowed_view_lots:
     start_date, end_date = resolver_periodo_lotes(filtro_periodo, data_inicial, data_final)
     limite_lotes = 12 if filtro_periodo == "Últimos lançamentos" else None
     tratativa_df = load_case_review_dashboard(start_date=start_date, end_date=end_date)
+    area_options = ["Lotes", "Painel", "Rankings", "Exportações"]
+    if allowed_manage_users:
+        area_options.append("Acessos")
     area_operacional = st.segmented_control(
         "Área operacional",
-        options=["Lotes", "Painel", "Rankings", "Exportações"],
-        default=st.session_state.get("ops_area_mode", "Lotes"),
+        options=area_options,
+        default=st.session_state.get("ops_area_mode", "Lotes") if st.session_state.get("ops_area_mode", "Lotes") in area_options else "Lotes",
         selection_mode="single",
         key="ops_area_segmented",
     )
@@ -3529,6 +3726,98 @@ if allowed_view_lots:
                         disabled=dados_status.empty,
                     )
             st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+
+    elif area_operacional == "Acessos" and allowed_manage_users:
+        st.markdown("#### Gestão de acessos")
+        st.caption("Cadastre usuários conforme a alçada disponível e mantenha a cadeia de acesso do cliente organizada dentro da própria plataforma.")
+        allowed_new_roles = get_manageable_roles(auth_user)
+        managed_users_df = load_managed_users(auth_user)
+
+        st.markdown("##### Novo usuário")
+        create_col1, create_col2, create_col3 = st.columns([1.2, 1, 1])
+        with create_col1:
+            novo_nome_usuario = st.text_input(
+                "Nome do usuário",
+                key="managed_user_name",
+                help="Use um nome de acesso simples. Espaços serão convertidos para ponto.",
+            )
+        with create_col2:
+            novo_nome_completo = st.text_input(
+                "Nome de exibição",
+                key="managed_user_full_name",
+                help="Nome que aparecerá nos controles e no histórico.",
+            )
+        with create_col3:
+            novo_perfil = st.selectbox(
+                "Perfil",
+                options=allowed_new_roles,
+                format_func=role_label,
+                key="managed_user_role",
+            )
+        senha_col1, senha_col2 = st.columns([1.2, 1])
+        with senha_col1:
+            nova_senha = st.text_input("Senha inicial", type="password", key="managed_user_password")
+        with senha_col2:
+            st.write("")
+            st.write("")
+            if st.button("Cadastrar usuário", use_container_width=True):
+                try:
+                    create_managed_user(auth_user, novo_nome_usuario, nova_senha, novo_perfil, novo_nome_completo)
+                    st.success(f"Usuário {novo_nome_usuario} cadastrado com sucesso.")
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+
+        st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
+        st.markdown("##### Usuários sob sua gestão")
+        if managed_users_df.empty:
+            st.caption("Nenhum usuário cadastrado nessa alçada ainda.")
+        else:
+            manage_options = {
+                f'{row["nome_exibicao"]} · {row["perfil"]} · {row["status_acesso"]}': row["username"]
+                for _, row in managed_users_df.iterrows()
+            }
+            selected_manage_label = st.selectbox(
+                "Selecionar usuário",
+                list(manage_options.keys()),
+                key="managed_user_selector",
+            )
+            selected_manage_username = manage_options[selected_manage_label]
+            selected_user_row = managed_users_df[managed_users_df["username"] == selected_manage_username].iloc[0]
+            mu1, mu2, mu3, mu4 = st.columns(4)
+            render_batch_metric(mu1, "Usuário", selected_user_row["username"])
+            render_batch_metric(mu2, "Perfil", selected_user_row["perfil"])
+            render_batch_metric(mu3, "Status", selected_user_row["status_acesso"])
+            render_batch_metric(mu4, "Responsável", selected_user_row["parent_username"] or selected_user_row["created_by"] or "Sistema")
+            toggle_label = "Desativar acesso" if selected_user_row["status_acesso"] == "Ativo" else "Reativar acesso"
+            if st.button(toggle_label, key=f"toggle_user_{selected_manage_username}", use_container_width=False):
+                try:
+                    update_user_active_status(
+                        auth_user,
+                        selected_manage_username,
+                        selected_user_row["status_acesso"] != "Ativo",
+                    )
+                    st.success("Status do usuário atualizado.")
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+            st.dataframe(
+                managed_users_df[
+                    ["nome_exibicao", "username", "perfil", "status_acesso", "created_by", "parent_username", "created_at"]
+                ].rename(
+                    columns={
+                        "nome_exibicao": "Nome",
+                        "username": "Usuário",
+                        "perfil": "Perfil",
+                        "status_acesso": "Status",
+                        "created_by": "Criado por",
+                        "parent_username": "Responsável",
+                        "created_at": "Criado em",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
 
     if area_operacional == "Lotes":
         st.markdown("#### Lotes")
