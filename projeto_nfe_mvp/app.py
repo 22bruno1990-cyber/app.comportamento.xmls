@@ -1387,7 +1387,8 @@ def load_managed_users(current_user):
     df["role"] = df["role"].apply(normalize_role)
     df["perfil"] = df["role"].apply(role_label)
     df["status_acesso"] = df["active"].apply(lambda valor: "Ativo" if bool(valor) else "Inativo")
-    df["nome_exibicao"] = df["full_name"].fillna("").replace("", df["username"])
+    nomes = df["full_name"].fillna("").astype(str).str.strip()
+    df["nome_exibicao"] = nomes.where(nomes != "", df["username"])
     return df
 
 
