@@ -2708,12 +2708,14 @@ def load_case_review_dashboard(start_date=None, end_date=None):
             conn,
             f"""
             SELECT
+                id,
                 arquivo,
                 prestador,
                 valor_nf,
                 valor_nf_num,
                 classificacao_final,
                 case_status,
+                analyst_note,
                 reviewed_by,
                 reviewed_at,
                 analisado_em
@@ -2735,7 +2737,9 @@ def load_case_review_dashboard(start_date=None, end_date=None):
         return df
 
     df["case_status"] = df["case_status"].apply(normalize_case_status_value)
+    df["analyst_note"] = df["analyst_note"].fillna("")
     df["reviewed_by"] = df["reviewed_by"].fillna("Não revisado").replace("", "Não revisado")
+    df["reviewed_at"] = df["reviewed_at"].fillna("")
     df["prestador"] = df["prestador"].fillna("Não informado").replace("", "Não informado")
     df["valor_nf_num"] = pd.to_numeric(df["valor_nf_num"], errors="coerce").fillna(0.0)
     return df
