@@ -1590,6 +1590,29 @@ def update_user_active_status(current_user, target_username, active):
         conn.commit()
 
 
+def delete_managed_user(current_user, target_username):
+    inicializar_banco()
+    if target_username == current_user["username"]:
+        raise ValueError("não é permitido excluir o próprio usuário logado")
+    with get_db_connection() as conn:
+        target = db_fetchone(
+            conn,
+            """
+            SELECT username, role, parent_username
+            FROM app_users
+            WHERE username = ?
+            """,
+            (target_username,),
+        )
+        if not target:
+            raise ValueError("usuário não encontrado")
+        target_dict = dict(target) if not isinstance(target, dict) else target
+        if not can_manage_target_user(current_user, target_dict):
+            raise ValueError("você não tem permissão para excluir esse usuário")
+        db_execute(conn, "DELETE FROM app_users WHERE username = ?", (target_username,))
+        conn.commit()
+
+
 def update_user_password(username, new_password):
     if len(new_password or "") < 6:
         raise ValueError("a nova senha precisa ter pelo menos 6 caracteres")
@@ -4006,17 +4029,27 @@ if allowed_view_lots:
             render_batch_metric(mu3, "Status", selected_user_row["status_acesso"])
             render_batch_metric(mu4, "Responsável", selected_user_row["parent_username"] or selected_user_row["created_by"] or "Sistema")
             toggle_label = "Desativar acesso" if selected_user_row["status_acesso"] == "Ativo" else "Reativar acesso"
-            if st.button(toggle_label, key=f"toggle_user_{selected_manage_username}", use_container_width=False):
-                try:
-                    update_user_active_status(
-                        auth_user,
-                        selected_manage_username,
-                        selected_user_row["status_acesso"] != "Ativo",
-                    )
-                    st.success("Status do usuário atualizado.")
-                    st.rerun()
-                except ValueError as exc:
-                    st.error(str(exc))
+            user_action_col1, user_action_col2 = st.columns([1, 1])
+            with user_action_col1:
+                if st.button(toggle_label, key=f"toggle_user_{selected_manage_username}", use_container_width=True):
+                    try:
+                        update_user_active_status(
+                            auth_user,
+                            selected_manage_username,
+                            selected_user_row["status_acesso"] != "Ativo",
+                        )
+                        st.success("Status do usuário atualizado.")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+            with user_action_col2:
+                if st.button("Excluir usuário", key=f"delete_user_{selected_manage_username}", use_container_width=True, type="secondary"):
+                    try:
+                        delete_managed_user(auth_user, selected_manage_username)
+                        st.success("Usuário excluído com sucesso.")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
             st.dataframe(
                 managed_users_df[
                     ["nome_exibicao", "username", "email", "perfil", "status_acesso", "created_by", "parent_username", "created_at"]
