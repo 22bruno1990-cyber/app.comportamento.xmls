@@ -332,14 +332,32 @@ st.markdown(
 
     .stTextInput label,
     .stTextInput div[data-testid="stWidgetLabel"],
+    .stSelectbox label,
+    .stSelectbox div[data-testid="stWidgetLabel"],
+    .stCheckbox label,
+    .stCheckbox div[data-testid="stWidgetLabel"],
+    .stDateInput label,
+    .stDateInput div[data-testid="stWidgetLabel"],
+    .stSegmentedControl label,
+    .stSegmentedControl div[data-testid="stWidgetLabel"],
     .stRadio label,
     .stRadio div[data-testid="stWidgetLabel"],
     .stFileUploader label,
     .stFileUploader div[data-testid="stWidgetLabel"],
     .stMarkdown h3,
     .stMarkdown h4,
+    .stMarkdown h5,
     .stCaptionContainer,
     div[data-testid="stCaptionContainer"] {
+        color: #152b4c !important;
+    }
+
+    div[data-testid="stWidgetLabel"] p,
+    label p,
+    .stCheckbox p,
+    .stSelectbox p,
+    .stDateInput p,
+    .stSegmentedControl p {
         color: #152b4c !important;
     }
 
