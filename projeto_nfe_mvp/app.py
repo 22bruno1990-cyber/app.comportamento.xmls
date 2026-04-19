@@ -1,10 +1,12 @@
 from datetime import date, datetime, timedelta
 import base64
+from email.message import EmailMessage
 import hashlib
 import hmac
 import os
 from pathlib import Path
 import re
+import smtplib
 import sqlite3
 import uuid
 import xml.etree.ElementTree as ET
@@ -1170,6 +1172,7 @@ def inicializar_banco():
                 CREATE TABLE IF NOT EXISTS app_users (
                     id BIGSERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
+                    email TEXT DEFAULT '',
                     full_name TEXT DEFAULT '',
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL DEFAULT 'master',
@@ -1205,6 +1208,7 @@ def inicializar_banco():
                 CREATE TABLE IF NOT EXISTS app_users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
+                    email TEXT DEFAULT '',
                     full_name TEXT DEFAULT '',
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL DEFAULT 'master',
@@ -1241,6 +1245,8 @@ def inicializar_banco():
 def ensure_app_users_schema(conn):
     if is_postgres():
         existing_columns = postgres_existing_columns(conn, "app_users")
+        if "email" not in existing_columns:
+            db_execute(conn, "ALTER TABLE app_users ADD COLUMN email TEXT DEFAULT ''")
         if "full_name" not in existing_columns:
             db_execute(conn, "ALTER TABLE app_users ADD COLUMN full_name TEXT DEFAULT ''")
         if "created_by" not in existing_columns:
@@ -1256,6 +1262,8 @@ def ensure_app_users_schema(conn):
         return
 
     existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(app_users)").fetchall()}
+    if "email" not in existing_columns:
+        conn.execute("ALTER TABLE app_users ADD COLUMN email TEXT DEFAULT ''")
     if "full_name" not in existing_columns:
         conn.execute("ALTER TABLE app_users ADD COLUMN full_name TEXT DEFAULT ''")
     if "created_by" not in existing_columns:
@@ -1303,12 +1311,12 @@ def bootstrap_admin_user():
                 conn,
                 """
                 INSERT INTO app_users (
-                    username, full_name, password_hash, role, created_by, parent_username,
+                    username, email, full_name, password_hash, role, created_by, parent_username,
                     active, must_change_password, password_updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, TRUE, FALSE, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, FALSE, CURRENT_TIMESTAMP)
                 """,
-                (user["username"], user["username"], hash_password(user["password"]), desired_role, "bootstrap", ""),
+                (user["username"], "", user["username"], hash_password(user["password"]), desired_role, "bootstrap", ""),
             )
         conn.commit()
 
@@ -1344,7 +1352,7 @@ def authenticate_user(username, password, required_role=None):
         user = db_fetchone(
             conn,
             """
-            SELECT username, full_name, password_hash, role, active, created_by, parent_username,
+            SELECT username, email, full_name, password_hash, role, active, created_by, parent_username,
                    must_change_password, password_updated_at, last_login_at
             FROM app_users
             WHERE username = ?
@@ -1370,6 +1378,7 @@ def authenticate_user(username, password, required_role=None):
         conn.commit()
     return {
         "username": user["username"],
+        "email": user.get("email") or "",
         "full_name": user.get("full_name") or user["username"],
         "role": normalized_role,
         "created_by": user.get("created_by") or "",
@@ -1386,7 +1395,7 @@ def load_managed_users(current_user):
             rows = db_fetchall(
                 conn,
                 """
-                SELECT username, full_name, role, active, created_by, parent_username, created_at
+                SELECT username, email, full_name, role, active, created_by, parent_username, created_at
                 FROM app_users
                 WHERE role <> 'master'
                 ORDER BY role, username
@@ -1396,7 +1405,7 @@ def load_managed_users(current_user):
             rows = db_fetchall(
                 conn,
                 """
-                SELECT username, full_name, role, active, created_by, parent_username, created_at
+                SELECT username, email, full_name, role, active, created_by, parent_username, created_at
                 FROM app_users
                 WHERE role = 'operacional' AND parent_username = ?
                 ORDER BY username
@@ -1420,7 +1429,69 @@ def load_managed_users(current_user):
     return df
 
 
-def create_managed_user(current_user, username, password, role, full_name=""):
+def get_secret_value(name, default=""):
+    try:
+        return str(st.secrets.get(name, default) or default)
+    except Exception:
+        return str(os.getenv(name, default) or default)
+
+
+def get_app_public_url():
+    return get_secret_value("APP_PUBLIC_URL", "https://app-comportamento-xmls.streamlit.app")
+
+
+def get_smtp_config():
+    host = get_secret_value("SMTP_HOST")
+    user = get_secret_value("SMTP_USER")
+    password = get_secret_value("SMTP_PASSWORD")
+    if not host or not user or not password:
+        return None
+    return {
+        "host": host,
+        "port": int(get_secret_value("SMTP_PORT", "587")),
+        "user": user,
+        "password": password,
+        "from": get_secret_value("SMTP_FROM", user),
+        "use_tls": get_secret_value("SMTP_USE_TLS", "true").lower() not in {"0", "false", "nao", "não"},
+    }
+
+
+def send_access_instructions_email(email, full_name, username, role):
+    smtp_config = get_smtp_config()
+    if not smtp_config:
+        return False, "SMTP não configurado nos Secrets."
+
+    app_url = get_app_public_url()
+    display_name = (full_name or username).strip()
+    message = EmailMessage()
+    message["Subject"] = "Acesso inicial à plataforma PSL"
+    message["From"] = smtp_config["from"]
+    message["To"] = email
+    message.set_content(
+        f"""Olá, {display_name}.
+
+Seu acesso à plataforma PSL foi criado.
+
+Link: {app_url}
+Usuário: {username}
+Perfil: {role_label(role)}
+
+Use a senha temporária informada pelo responsável interno.
+No primeiro acesso, o sistema solicitará a criação de uma nova senha.
+
+Por segurança, não compartilhe suas credenciais.
+"""
+    )
+
+    with smtplib.SMTP(smtp_config["host"], smtp_config["port"], timeout=20) as smtp:
+        if smtp_config["use_tls"]:
+            smtp.starttls()
+        smtp.login(smtp_config["user"], smtp_config["password"])
+        smtp.send_message(message)
+    return True, "E-mail de instruções enviado."
+
+
+def create_managed_user(current_user, username, password, role, full_name="", email=""):
     desired_role = normalize_role(role)
     allowed_roles = get_manageable_roles(current_user)
     if desired_role not in allowed_roles:
@@ -1428,8 +1499,11 @@ def create_managed_user(current_user, username, password, role, full_name=""):
 
     username_clean = normalizar_texto(username).replace(" ", ".")
     username_clean = re.sub(r"[^a-z0-9._-]", "", username_clean)
+    email_clean = (email or "").strip().lower()
     if not username_clean:
         raise ValueError("informe um usuário válido")
+    if email_clean and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email_clean):
+        raise ValueError("informe um e-mail válido")
     if len(password or "") < 6:
         raise ValueError("a senha precisa ter pelo menos 6 caracteres")
 
@@ -1445,13 +1519,14 @@ def create_managed_user(current_user, username, password, role, full_name=""):
             conn,
             """
             INSERT INTO app_users (
-                username, full_name, password_hash, role, created_by, parent_username,
+                username, email, full_name, password_hash, role, created_by, parent_username,
                 active, must_change_password
             )
-            VALUES (?, ?, ?, ?, ?, ?, TRUE, TRUE)
+            VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, TRUE)
             """,
             (
                 username_clean,
+                email_clean,
                 (full_name or username_clean).strip(),
                 hash_password(password),
                 desired_role,
@@ -3828,7 +3903,7 @@ if allowed_view_lots:
         managed_users_df = load_managed_users(auth_user)
 
         st.markdown("##### Novo usuário")
-        create_col1, create_col2, create_col3 = st.columns([1.2, 1, 1])
+        create_col1, create_col2, create_col3 = st.columns([1.2, 1.1, 1])
         with create_col1:
             novo_nome_usuario = st.text_input(
                 "Nome do usuário",
@@ -3836,17 +3911,30 @@ if allowed_view_lots:
                 help="Use um nome de acesso simples. Espaços serão convertidos para ponto.",
             )
         with create_col2:
+            novo_email = st.text_input(
+                "E-mail",
+                key="managed_user_email",
+                help="Usado para enviar as instruções de primeiro acesso.",
+            )
+        with create_col3:
             novo_nome_completo = st.text_input(
                 "Nome de exibição",
                 key="managed_user_full_name",
                 help="Nome que aparecerá nos controles e no histórico.",
             )
-        with create_col3:
+        role_col, mail_col = st.columns([1, 1.4])
+        with role_col:
             novo_perfil = st.selectbox(
                 "Perfil",
                 options=allowed_new_roles,
                 format_func=role_label,
                 key="managed_user_role",
+            )
+        with mail_col:
+            enviar_email_acesso = st.checkbox(
+                "Enviar instruções por e-mail",
+                value=True,
+                help="O e-mail envia link, usuário e orientações. A senha temporária não é enviada por segurança.",
             )
         senha_col1, senha_col2 = st.columns([1.2, 1])
         with senha_col1:
@@ -3856,11 +3944,27 @@ if allowed_view_lots:
             st.write("")
             if st.button("Cadastrar usuário", use_container_width=True):
                 try:
-                    create_managed_user(auth_user, novo_nome_usuario, nova_senha, novo_perfil, novo_nome_completo)
+                    create_managed_user(auth_user, novo_nome_usuario, nova_senha, novo_perfil, novo_nome_completo, novo_email)
                     st.success(f"Usuário {novo_nome_usuario} cadastrado com sucesso.")
+                    if enviar_email_acesso:
+                        if not novo_email:
+                            st.warning("Usuário criado, mas o e-mail não foi enviado porque o campo E-mail está vazio.")
+                        else:
+                            sent, message = send_access_instructions_email(
+                                novo_email,
+                                novo_nome_completo,
+                                novo_nome_usuario,
+                                novo_perfil,
+                            )
+                            if sent:
+                                st.success(message)
+                            else:
+                                st.warning(message)
                     st.rerun()
                 except ValueError as exc:
                     st.error(str(exc))
+                except Exception as exc:
+                    st.warning(f"Usuário criado, mas não foi possível enviar o e-mail: {exc}")
 
         st.markdown('<div class="section-gap"></div>', unsafe_allow_html=True)
         st.markdown("##### Usuários sob sua gestão")
@@ -3897,11 +4001,12 @@ if allowed_view_lots:
                     st.error(str(exc))
             st.dataframe(
                 managed_users_df[
-                    ["nome_exibicao", "username", "perfil", "status_acesso", "created_by", "parent_username", "created_at"]
+                    ["nome_exibicao", "username", "email", "perfil", "status_acesso", "created_by", "parent_username", "created_at"]
                 ].rename(
                     columns={
                         "nome_exibicao": "Nome",
                         "username": "Usuário",
+                        "email": "E-mail",
                         "perfil": "Perfil",
                         "status_acesso": "Status",
                         "created_by": "Criado por",
