@@ -26,8 +26,80 @@ st.set_page_config(
     layout="wide",
 )
 
-st.markdown(
-    """
+THEME_PRESETS = {
+    "default": {
+        "client_name": "PSL",
+        "kicker": "PSL | Revenue Protection",
+        "primary": "#0b2d56",
+        "primary_dark": "#07111f",
+        "primary_mid": "#114581",
+        "accent": "#5f96d8",
+        "accent_alt": "#7fa7d8",
+        "app_bg_1": "rgba(11, 94, 215, 0.12)",
+        "app_bg_2": "rgba(255, 122, 69, 0.12)",
+        "button_start": "#5b86bf",
+        "button_end": "#7fa7d8",
+        "button_border": "#6f96ca",
+        "chart_start": "#2f73c6",
+        "chart_end": "#5f96d8",
+        "metric_1": "#173761",
+        "metric_2": "#275ea7",
+        "metric_3": "#496b96",
+        "metric_4": "#7ca4d5",
+    },
+    "rcmec": {
+        "client_name": "RCMEC",
+        "kicker": "RCMEC | Revenue Protection",
+        "primary": "#1f5a25",
+        "primary_dark": "#123817",
+        "primary_mid": "#2f6d35",
+        "accent": "#f06f27",
+        "accent_alt": "#f7a35f",
+        "app_bg_1": "rgba(31, 90, 37, 0.13)",
+        "app_bg_2": "rgba(240, 111, 39, 0.14)",
+        "button_start": "#1f5a25",
+        "button_end": "#3f8145",
+        "button_border": "#2f6d35",
+        "chart_start": "#1f5a25",
+        "chart_end": "#f06f27",
+        "metric_1": "#1f5a25",
+        "metric_2": "#3f8145",
+        "metric_3": "#25582b",
+        "metric_4": "#f06f27",
+    },
+}
+
+
+def get_theme_value(name, default=""):
+    try:
+        value = st.secrets.get(name, default)
+    except Exception:
+        value = os.getenv(name, default)
+    return str(value or default)
+
+
+def load_client_theme():
+    theme_key = get_theme_value("CLIENT_THEME", "default").lower()
+    theme = THEME_PRESETS.get(theme_key, THEME_PRESETS["default"]).copy()
+    secret_map = {
+        "client_name": "CLIENT_NAME",
+        "kicker": "CLIENT_KICKER",
+        "primary": "CLIENT_PRIMARY_COLOR",
+        "primary_dark": "CLIENT_PRIMARY_DARK",
+        "primary_mid": "CLIENT_PRIMARY_MID",
+        "accent": "CLIENT_ACCENT_COLOR",
+        "accent_alt": "CLIENT_ACCENT_ALT",
+    }
+    for key, secret_name in secret_map.items():
+        override = get_theme_value(secret_name, "")
+        if override:
+            theme[key] = override
+    return theme
+
+
+CLIENT_THEME = load_client_theme()
+
+THEME_CSS_TEMPLATE = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap');
 
@@ -37,8 +109,8 @@ st.markdown(
 
     .stApp {
         background:
-            radial-gradient(circle at top left, rgba(11, 94, 215, 0.12), transparent 28%),
-            radial-gradient(circle at top right, rgba(255, 122, 69, 0.12), transparent 24%),
+            radial-gradient(circle at top left, __APP_BG_1__, transparent 28%),
+            radial-gradient(circle at top right, __APP_BG_2__, transparent 24%),
             linear-gradient(180deg, #f6f8fc 0%, #eef3fb 100%);
     }
 
@@ -48,7 +120,7 @@ st.markdown(
     }
 
     .hero {
-        background: linear-gradient(135deg, #07111f 0%, #0b2d56 55%, #114581 100%);
+        background: linear-gradient(135deg, __PRIMARY_DARK__ 0%, __PRIMARY__ 55%, __PRIMARY_MID__ 100%);
         padding: 28px 30px;
         border-radius: 26px;
         color: white;
@@ -62,7 +134,7 @@ st.markdown(
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: #9fd1ff;
+        color: __ACCENT_ALT__;
         margin-bottom: 10px;
     }
 
@@ -171,14 +243,14 @@ st.markdown(
         min-height: 42px;
     }
 
-    .blue { background: linear-gradient(135deg, #173761 0%, #275ea7 100%); }
-    .red { background: linear-gradient(135deg, #102947 0%, #1a4778 100%); }
-    .orange { background: linear-gradient(135deg, #22466f 0%, #3e78b8 100%); }
-    .gold { background: linear-gradient(135deg, #35567f 0%, #5d89bf 100%); }
-    .green { background: linear-gradient(135deg, #496b96 0%, #7ca4d5 100%); }
+    .blue { background: linear-gradient(135deg, __METRIC_1__ 0%, __METRIC_2__ 100%); }
+    .red { background: linear-gradient(135deg, __PRIMARY_DARK__ 0%, __PRIMARY__ 100%); }
+    .orange { background: linear-gradient(135deg, __METRIC_3__ 0%, __ACCENT__ 100%); }
+    .gold { background: linear-gradient(135deg, __METRIC_3__ 0%, __ACCENT_ALT__ 100%); }
+    .green { background: linear-gradient(135deg, __METRIC_2__ 0%, __METRIC_4__ 100%); }
 
     .insight-box {
-        border-left: 5px solid #1e5ea8;
+        border-left: 5px solid __ACCENT__;
         background: white;
         border-radius: 18px;
         padding: 18px 18px 18px 20px;
@@ -269,7 +341,7 @@ st.markdown(
     .chart-fill {
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #2f73c6 0%, #5f96d8 100%);
+        background: linear-gradient(90deg, __CHART_START__ 0%, __CHART_END__ 100%);
     }
 
     .chart-value {
@@ -385,17 +457,17 @@ st.markdown(
 
     .stButton > button,
     .stForm button {
-        background: linear-gradient(135deg, #5b86bf 0%, #7fa7d8 100%) !important;
+        background: linear-gradient(135deg, __BUTTON_START__ 0%, __BUTTON_END__ 100%) !important;
         color: #ffffff !important;
-        border: 1px solid #6f96ca !important;
+        border: 1px solid __BUTTON_BORDER__ !important;
         border-radius: 16px !important;
         box-shadow: 0 10px 24px rgba(77, 117, 170, 0.18) !important;
     }
 
     .stButton > button:hover,
     .stForm button:hover {
-        background: linear-gradient(135deg, #4f79b0 0%, #729ccd 100%) !important;
-        border-color: #5b86bf !important;
+        background: linear-gradient(135deg, __PRIMARY__ 0%, __ACCENT__ 100%) !important;
+        border-color: __ACCENT__ !important;
     }
 
     section[data-testid="stSidebar"] .stMarkdown h2,
@@ -599,9 +671,32 @@ st.markdown(
         max-width: 28rem;
     }
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    """
+
+THEME_CSS_REPLACEMENTS = {
+    "__APP_BG_1__": CLIENT_THEME["app_bg_1"],
+    "__APP_BG_2__": CLIENT_THEME["app_bg_2"],
+    "__PRIMARY__": CLIENT_THEME["primary"],
+    "__PRIMARY_DARK__": CLIENT_THEME["primary_dark"],
+    "__PRIMARY_MID__": CLIENT_THEME["primary_mid"],
+    "__ACCENT__": CLIENT_THEME["accent"],
+    "__ACCENT_ALT__": CLIENT_THEME["accent_alt"],
+    "__BUTTON_START__": CLIENT_THEME["button_start"],
+    "__BUTTON_END__": CLIENT_THEME["button_end"],
+    "__BUTTON_BORDER__": CLIENT_THEME["button_border"],
+    "__CHART_START__": CLIENT_THEME["chart_start"],
+    "__CHART_END__": CLIENT_THEME["chart_end"],
+    "__METRIC_1__": CLIENT_THEME["metric_1"],
+    "__METRIC_2__": CLIENT_THEME["metric_2"],
+    "__METRIC_3__": CLIENT_THEME["metric_3"],
+    "__METRIC_4__": CLIENT_THEME["metric_4"],
+}
+
+theme_css = THEME_CSS_TEMPLATE
+for token, value in THEME_CSS_REPLACEMENTS.items():
+    theme_css = theme_css.replace(token, value)
+
+st.markdown(theme_css, unsafe_allow_html=True)
 
 NAMESPACE = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
 BASE_DIR = Path(__file__).resolve().parent
@@ -3329,7 +3424,7 @@ def render_hero(copy):
     st.markdown(
         f"""
         <div class="hero">
-            <div class="hero-kicker">PSL | Revenue Protection</div>
+            <div class="hero-kicker">{CLIENT_THEME["kicker"]}</div>
             <h1>{copy["hero_title"]}</h1>
             <p>
                 {copy["hero_text"]}
