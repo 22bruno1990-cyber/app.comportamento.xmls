@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DocSignal | Inteligência documental para auditoria e risco</title>
+  <meta name="description" content="DocSignal transforma lotes de documentos em filas inteligentes de revisão, com score, motivo do alerta e valor associado.">
+  <style>
+    :root {
+      --ink: #07111f;
+      --navy: #102844;
+      --blue: #2f73c6;
+      --sky: #dbeafe;
+      --cyan: #5cc8ff;
+      --amber: #d89b37;
+      --green: #4fa37b;
+      --paper: #f8fbff;
+      --muted: #62738a;
+      --line: rgba(16, 40, 68, 0.12);
+      --shadow: 0 18px 60px rgba(7, 17, 31, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f4f7fb;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(248, 251, 255, 0.12);
+      background: rgba(7, 17, 31, 0.76);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      color: #f8fbff;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: block;
+      background: #f8fbff;
+      box-shadow: 0 10px 30px rgba(92, 200, 255, 0.25);
+      overflow: hidden;
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      font-size: 0.92rem;
+      color: rgba(248, 251, 255, 0.78);
+    }
+
+    .nav-links a:hover { color: #fff; }
+
+    .nav-cta,
+    .button {
+      border: 1px solid rgba(248, 251, 255, 0.24);
+      background: #f8fbff;
+      color: var(--ink);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    .button.secondary {
+      background: rgba(248, 251, 255, 0.08);
+      color: #f8fbff;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 88vh;
+      padding: 142px 0 88px;
+      overflow: hidden;
+      background: #07111f;
+      color: #f8fbff;
+    }
+
+    #signalCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.72;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(7, 17, 31, 0.42);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 2;
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #cfe4ff;
+      font-size: 0.82rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 34px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--cyan);
+    }
+
+    h1 {
+      margin: 22px 0 0;
+      max-width: 880px;
+      font-size: clamp(3rem, 7vw, 7rem);
+      line-height: 0.92;
+      letter-spacing: 0;
+    }
+
+    .hero-copy {
+      margin: 28px 0 0;
+      max-width: 720px;
+      font-size: clamp(1.08rem, 2vw, 1.35rem);
+      color: rgba(248, 251, 255, 0.82);
+    }
+
+    .hero-actions {
+      margin-top: 34px;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .proof-strip {
+      margin-top: 58px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      max-width: 980px;
+    }
+
+    .proof-item {
+      border: 1px solid rgba(248, 251, 255, 0.16);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(248, 251, 255, 0.08);
+      color: rgba(248, 251, 255, 0.84);
+      min-height: 86px;
+    }
+
+    .proof-item strong {
+      display: block;
+      color: #fff;
+      font-size: 1.2rem;
+      margin-bottom: 4px;
+    }
+
+    section {
+      padding: 76px 0;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 32px;
+      margin-bottom: 28px;
+    }
+
+    h2 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2rem, 4vw, 4rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .section-copy {
+      max-width: 520px;
+      color: var(--muted);
+      font-size: 1.02rem;
+      margin: 0;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 6px 28px rgba(7, 17, 31, 0.06);
+      min-height: 230px;
+    }
+
+    .card h3 {
+      margin: 0 0 12px;
+      font-size: 1.18rem;
+      line-height: 1.2;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 9px;
+      margin-bottom: 18px;
+      border-radius: 6px;
+      background: #edf4ff;
+      color: var(--navy);
+      font-size: 0.78rem;
+      font-weight: 900;
+    }
+
+    .band {
+      background: #fff;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      align-items: center;
+    }
+
+    .steps {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .step-number {
+      width: 46px;
+      height: 46px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 900;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .step span {
+      color: var(--muted);
+    }
+
+    .signal-panel {
+      min-height: 500px;
+      border-radius: 8px;
+      border: 1px solid rgba(16, 40, 68, 0.16);
+      background: #07111f;
+      color: #f8fbff;
+      padding: 26px;
+      box-shadow: var(--shadow);
+      display: grid;
+      align-content: space-between;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .signal-panel::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border: 1px solid rgba(219, 234, 254, 0.12);
+      border-radius: 8px;
+    }
+
+    .signal-panel > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric {
+      border: 1px solid rgba(248, 251, 255, 0.14);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(248, 251, 255, 0.08);
+    }
+
+    .metric b {
+      display: block;
+      font-size: 1.65rem;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .metric span {
+      color: rgba(248, 251, 255, 0.7);
+      font-size: 0.86rem;
+    }
+
+    .queue {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .queue-item {
+      display: grid;
+      grid-template-columns: 70px 1fr 88px;
+      gap: 14px;
+      align-items: center;
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(248, 251, 255, 0.1);
+      border: 1px solid rgba(248, 251, 255, 0.12);
+    }
+
+    .score {
+      font-weight: 900;
+      color: var(--cyan);
+    }
+
+    .queue-item small {
+      color: rgba(248, 251, 255, 0.72);
+      display: block;
+      margin-top: 2px;
+    }
+
+    .price-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 26px;
+      box-shadow: 0 10px 36px rgba(7, 17, 31, 0.08);
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .status-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      min-height: 320px;
+      box-shadow: 0 8px 30px rgba(7, 17, 31, 0.06);
+    }
+
+    .status-card.delivered {
+      border-top: 6px solid var(--green);
+    }
+
+    .status-card.progress {
+      border-top: 6px solid var(--amber);
+    }
+
+    .status-card.roadmap {
+      border-top: 6px solid var(--blue);
+    }
+
+    .status-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .status-title h3 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-size: 0.76rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .status-pill.delivered {
+      color: #0f5132;
+      background: #dff5ea;
+    }
+
+    .status-pill.progress {
+      color: #6d4508;
+      background: #fff0d3;
+    }
+
+    .status-pill.roadmap {
+      color: #173761;
+      background: #e7f0ff;
+    }
+
+    .status-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-list li {
+      color: var(--muted);
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .status-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.66em;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--blue);
+    }
+
+    .status-card.delivered .status-list li::before {
+      background: var(--green);
+    }
+
+    .status-card.progress .status-list li::before {
+      background: var(--amber);
+    }
+
+    .price-card.featured {
+      border: 2px solid var(--blue);
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .compare-note {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 20px;
+      background: #fff;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .compare-note strong {
+      color: var(--ink);
+    }
+
+    .operational-entry {
+      margin-top: 22px;
+      background: linear-gradient(135deg, var(--navy), #173761);
+      border-radius: 8px;
+      padding: 28px;
+      color: #f8fbff;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
+      align-items: center;
+      box-shadow: 0 18px 44px rgba(7, 17, 31, 0.16);
+    }
+
+    .operational-entry .tag {
+      background: rgba(255, 255, 255, 0.12);
+      color: #dbeafe;
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .operational-entry h3 {
+      color: #fff;
+      margin: 12px 0 10px;
+      font-size: 1.55rem;
+    }
+
+    .operational-entry p {
+      color: rgba(248, 251, 255, 0.78);
+      margin: 0;
+      line-height: 1.65;
+    }
+
+    .operational-price {
+      text-align: right;
+      font-size: 2.6rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .operational-price small {
+      display: block;
+      margin-top: 10px;
+      color: rgba(248, 251, 255, 0.72);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .operational-entry .list {
+      margin-top: 18px;
+      color: rgba(248, 251, 255, 0.78);
+    }
+
+    .operational-entry .list li::before {
+      background: var(--cyan);
+    }
+
+    .monthly-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .monthly-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 190px;
+      box-shadow: 0 8px 28px rgba(7, 17, 31, 0.06);
+    }
+
+    .monthly-card h4 {
+      margin: 10px 0 8px;
+      font-size: 1rem;
+    }
+
+    .monthly-price {
+      font-size: 1.55rem;
+      font-weight: 900;
+      color: var(--ink);
+    }
+
+    .monthly-price small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .price {
+      margin: 14px 0 20px;
+      font-size: 2.3rem;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .price small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .list {
+      padding: 0;
+      margin: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      color: var(--muted);
+    }
+
+    .list li {
+      padding-left: 18px;
+      position: relative;
+    }
+
+    .list li::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: var(--blue);
+      position: absolute;
+      left: 0;
+      top: 0.65em;
+    }
+
+    .cta {
+      background: var(--ink);
+      color: #f8fbff;
+    }
+
+    .cta-box {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 28px;
+      align-items: center;
+      padding: 46px 0;
+    }
+
+    .cta h2 {
+      color: #fff;
+    }
+
+    .cta p {
+      color: rgba(248, 251, 255, 0.72);
+      margin: 18px 0 0;
+      max-width: 680px;
+    }
+
+    footer {
+      padding: 34px 0;
+      background: #050b18;
+      color: rgba(248, 251, 255, 0.68);
+      font-size: 0.92rem;
+    }
+
+    .footer-inner {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 860px) {
+      .nav-links { display: none; }
+      .hero { min-height: auto; padding-top: 120px; }
+      .proof-strip,
+      .grid-3,
+      .grid-4,
+      .compare-grid,
+      .operational-entry,
+      .monthly-grid,
+      .status-board,
+      .workflow,
+      .cta-box {
+        grid-template-columns: 1fr;
+      }
+      .section-head {
+        align-items: start;
+        flex-direction: column;
+      }
+      .queue-item {
+        grid-template-columns: 54px 1fr;
+      }
+      .queue-item .amount {
+        grid-column: 2;
+      }
+      .operational-price {
+        text-align: left;
+      }
+      h1 { font-size: clamp(3rem, 16vw, 5rem); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav" aria-label="Navegação principal">
+      <a class="brand" href="#top" aria-label="DocSignal">
+        <span class="brand-mark"><img src="assets/docsignal-mark.svg" alt=""></span>
+        <span>DocSignal</span>
+      </a>
+      <div class="nav-links">
+        <a href="#problema">Problema</a>
+        <a href="#fluxo">Como funciona</a>
+        <a href="#pacotes">Comparativo</a>
+        <a href="#piloto">Piloto</a>
+      </div>
+      <a class="nav-cta" href="docsignal_interesse.html">Solicitar diagnóstico</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-label="DocSignal">
+      <canvas id="signalCanvas" aria-hidden="true"></canvas>
+      <div class="hero-inner">
+        <div class="eyebrow">Inteligência documental para auditoria e risco</div>
+        <h1>Encontre sinais de risco antes da revisão manual.</h1>
+        <p class="hero-copy">
+          O DocSignal transforma lotes de XMLs, planilhas e bases documentais em filas inteligentes de revisão,
+          apontando duplicidades, reapresentações, fracionamentos e padrões fora do comportamento esperado.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#piloto">Ver opções de piloto</a>
+          <a class="button secondary" href="#pacotes">Comparar contratação</a>
+        </div>
+        <div class="proof-strip" aria-label="Principais entregas">
+          <div class="proof-item"><strong>Score</strong> priorização por risco e motivo do alerta</div>
+          <div class="proof-item"><strong>CSV</strong> base pronta para conferência interna</div>
+          <div class="proof-item"><strong>Histórico</strong> memória para comparar lotes futuros</div>
+          <div class="proof-item"><strong>Premium</strong> caminho para OCR em PDFs e imagens</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="problema">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Documentos espalhados criam revisão cega.</h2>
+          <p class="section-copy">
+            XMLs, planilhas, PDFs, comprovantes e relatórios de ERP chegam por caminhos diferentes. Sem priorização,
+            a equipe revisa volume demais e pode deixar passar o que realmente importa.
+          </p>
+        </div>
+        <div class="grid-3">
+          <article class="card">
+            <span class="tag">Contas a pagar</span>
+            <h3>Pagamentos podem avançar com duplicidades e referências reaproveitadas.</h3>
+            <p>O DocSignal aponta notas reapresentadas, fracionamentos, valores fora da referência e fornecedores com padrão atípico.</p>
+          </article>
+          <article class="card">
+            <span class="tag">Saúde</span>
+            <h3>Contas e cobranças de prestadores podem esconder padrões repetitivos.</h3>
+            <p>A ferramenta prioriza documentos para auditoria, glosa e prevenção de perdas sem prometer fraude confirmada.</p>
+          </article>
+          <article class="card">
+            <span class="tag">Operações</span>
+            <h3>OS, contratos, peças e serviços viram retrabalho quando a conferência é manual.</h3>
+            <p>O diagnóstico ajuda a cruzar referências internas, fornecedores, categorias e valores associados aos alertas.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="fluxo" class="band">
+      <div class="wrap workflow">
+        <div>
+          <div class="section-head" style="display:block; margin-bottom:22px;">
+            <h2>Da base documental para a fila de revisão.</h2>
+            <p class="section-copy" style="margin-top:18px;">
+              O piloto não troca o ERP nem muda o processo atual. Ele usa arquivos que a empresa já possui para entregar uma leitura objetiva do risco.
+            </p>
+          </div>
+          <div class="steps">
+            <div class="step">
+              <div class="step-number">1</div>
+              <div><strong>Enviar lote</strong><span>XML NF-e, CSV/XLSX ou recorte exportado do fluxo atual.</span></div>
+            </div>
+            <div class="step">
+              <div class="step-number">2</div>
+              <div><strong>Processar sinais</strong><span>Duplicidade técnica, reapresentação, fracionamento, referência repetida e comportamento anômalo.</span></div>
+            </div>
+            <div class="step">
+              <div class="step-number">3</div>
+              <div><strong>Priorizar revisão</strong><span>Score, motivo do alerta, valor associado, CSV e relatório executivo.</span></div>
+            </div>
+            <div class="step">
+              <div class="step-number">4</div>
+              <div><strong>Decidir continuidade</strong><span>Piloto, implantação assistida e rotina mensal conforme o valor encontrado.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="signal-panel" aria-label="Exemplo de painel DocSignal">
+          <div>
+            <span class="eyebrow">Painel executivo</span>
+            <h2 style="font-size:2.4rem; margin-top:18px;">Fila priorizada por comportamento documental.</h2>
+          </div>
+          <div>
+            <div class="metric-row">
+              <div class="metric"><b>39</b><span>documentos analisados</span></div>
+              <div class="metric"><b>17</b><span>alertas score 60+</span></div>
+              <div class="metric"><b>R$ 37k</b><span>valor associado</span></div>
+            </div>
+            <div class="queue">
+              <div class="queue-item">
+                <div class="score">92</div>
+                <div><strong>Referência interna repetida</strong><small>Fornecedor + contrato + valor recorrente</small></div>
+                <div class="amount">R$ 8.900</div>
+              </div>
+              <div class="queue-item">
+                <div class="score">81</div>
+                <div><strong>Possível fracionamento</strong><small>Valor compatível com divisão em 3 lançamentos</small></div>
+                <div class="amount">R$ 5.200</div>
+              </div>
+              <div class="queue-item">
+                <div class="score">73</div>
+                <div><strong>Documento reapresentado</strong><small>Chave de negócio já vista no lote</small></div>
+                <div class="amount">R$ 3.640</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="entrega">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Promessa clara: o que já entrega, o que está em evolução e o que é roadmap.</h2>
+          <p class="section-copy">
+            O DocSignal é apresentado com transparência: a operação atual já cobre XML e planilhas; PDF, imagem e OCR entram como expansão premium.
+          </p>
+        </div>
+        <div class="status-board">
+          <article class="status-card delivered">
+            <div class="status-title">
+              <h3>Entregável hoje</h3>
+              <span class="status-pill delivered">Ativo</span>
+            </div>
+            <ul class="status-list">
+              <li>Leitura de XML NF-e.</li>
+              <li>Leitura de planilhas CSV/XLSX.</li>
+              <li>Score técnico e comportamental.</li>
+              <li>Duplicidade, reapresentação, fracionamento e referência repetida.</li>
+              <li>Painel executivo, CSV e relatório executivo.</li>
+              <li>Histórico, lotes e perfis de acesso.</li>
+            </ul>
+          </article>
+          <article class="status-card progress">
+            <div class="status-title">
+              <h3>Em trâmite</h3>
+              <span class="status-pill progress">Experimental</span>
+            </div>
+            <ul class="status-list">
+              <li>Modo Master Premium externo.</li>
+              <li>Captura documental de PDF e imagem.</li>
+              <li>Registro de hash e trilha técnica para arquivos não estruturados.</li>
+              <li>Validação comercial do pacote Multimodal Premium.</li>
+              <li>Ajustes por domínio: saúde, contas a pagar e operação.</li>
+            </ul>
+          </article>
+          <article class="status-card roadmap">
+            <div class="status-title">
+              <h3>Roadmap premium</h3>
+              <span class="status-pill roadmap">Futuro</span>
+            </div>
+            <ul class="status-list">
+              <li>OCR automático para PDFs e imagens.</li>
+              <li>Extração de campos como valor, CNPJ, data e número do documento.</li>
+              <li>Validação assistida com confiança por campo.</li>
+              <li>Integração com ERP e rotinas internas do cliente.</li>
+              <li>Regras específicas por fornecedor, OS, contrato ou equipamento.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="pacotes">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Escolha o tamanho do diagnóstico.</h2>
+          <p class="section-copy">
+            O valor muda pelo escopo, não por desconto. Empresas menores podem começar com menos documentos; empresas com mais volume recebem uma análise mais completa.
+          </p>
+        </div>
+        <div class="compare-grid">
+          <article class="price-card">
+            <span class="tag">Starter</span>
+            <h3>Diagnóstico compacto</h3>
+            <div class="price">R$ 900<small>7 dias | até 100 documentos</small></div>
+            <ul class="list">
+              <li>1 lote.</li>
+              <li>XML ou planilha simples.</li>
+              <li>Fila priorizada por risco.</li>
+              <li>CSV dos alertas.</li>
+              <li>Resumo executivo simples.</li>
+              <li>Devolutiva de 30 minutos.</li>
+              <li>Sem ajuste pesado de planilha.</li>
+            </ul>
+          </article>
+          <article class="price-card featured">
+            <span class="tag">Essencial</span>
+            <h3>Diagnóstico recomendado</h3>
+            <div class="price">R$ 1.500<small>10 dias | até 200 documentos</small></div>
+            <ul class="list">
+              <li>Até 2 lotes.</li>
+              <li>XML e/ou planilha CSV/XLSX.</li>
+              <li>Score técnico e comportamental.</li>
+              <li>CSV e relatório executivo.</li>
+              <li>Top 3 a 5 casos para revisão.</li>
+              <li>Devolutiva de 45 minutos.</li>
+              <li>1 ajuste simples de mapeamento.</li>
+            </ul>
+          </article>
+          <article class="price-card">
+            <span class="tag">Executivo</span>
+            <h3>Diagnóstico completo</h3>
+            <div class="price">R$ 2.500<small>15 dias | até 300 documentos</small></div>
+            <ul class="list">
+              <li>1 recorte fechado de análise.</li>
+              <li>XML e/ou planilha CSV/XLSX.</li>
+              <li>Análise completa com score e valor associado.</li>
+              <li>CSV e relatório executivo.</li>
+              <li>Reunião de abertura.</li>
+              <li>Reunião de devolutiva.</li>
+              <li>Sem rotina mensal ou fila operacional contínua.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="compare-note">
+          <span><strong>Diagnóstico:</strong> melhor para provar valor com um recorte limitado antes de assumir rotina.</span>
+          <span><strong>Start Mensal:</strong> melhor para quem já quer começar com lote recorrente e acompanhamento.</span>
+          <span><strong>Premium OCR:</strong> expansão sob consulta, sem preço fixo nesta página.</span>
+        </div>
+        <article class="operational-entry">
+          <div>
+            <span class="tag">Start Mensal</span>
+            <h3>Comece já com rotina assistida.</h3>
+            <p>
+              Para empresas que não querem apenas um diagnóstico pontual e já precisam iniciar uma rotina mensal de revisão documental,
+              com XML, planilhas, histórico, fila de tratativa e devolutiva executiva.
+            </p>
+            <ul class="list">
+              <li>XML NF-e + planilhas CSV/XLSX.</li>
+              <li>Até 500 documentos no primeiro mês.</li>
+              <li>Configuração inicial de domínio, usuários e lote.</li>
+              <li>CSV, relatório executivo e reunião de achados.</li>
+            </ul>
+          </div>
+          <div class="operational-price">
+            R$ 3.000
+            <small>primeiro mês assistido | implantação leve incluída</small>
+          </div>
+        </article>
+        <div class="monthly-grid" aria-label="Mensalidades após diagnóstico">
+          <article class="monthly-card">
+            <span class="tag">Mensal Starter</span>
+            <h4>Monitoramento</h4>
+            <div class="monthly-price">R$ 1.500<small>até 250 documentos/mês</small></div>
+            <p class="section-copy">Para empresa menor ou operação com baixo volume recorrente.</p>
+          </article>
+          <article class="monthly-card">
+            <span class="tag">Mensal Essencial</span>
+            <h4>Operação recorrente</h4>
+            <div class="monthly-price">R$ 3.000<small>até 500 documentos/mês</small></div>
+            <p class="section-copy">Para rotina mensal com XML, planilhas, histórico e devolutiva.</p>
+          </article>
+          <article class="monthly-card">
+            <span class="tag">Mensal Executivo</span>
+            <h4>Operação ampliada</h4>
+            <div class="monthly-price">R$ 5.000<small>até 1.000 documentos/mês</small></div>
+            <p class="section-copy">Para mais lotes, mais áreas e acompanhamento executivo.</p>
+          </article>
+          <article class="monthly-card">
+            <span class="tag">Sob proposta</span>
+            <h4>Alto volume</h4>
+            <div class="monthly-price">R$ 6.000+<small>acima de 1.000 documentos/mês</small></div>
+            <p class="section-copy">Para volume maior, regras específicas ou necessidade premium.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="piloto" class="cta">
+      <div class="wrap cta-box">
+        <div>
+          <h2>Escolha como começar.</h2>
+          <p>
+            Use um diagnóstico para validar valor com menos atrito ou entre direto no Start Mensal quando já existir volume recorrente.
+            Sem integração obrigatória e sem promessa de fraude confirmada: o foco é priorizar risco e organizar a revisão.
+          </p>
+        </div>
+        <div>
+          <a class="button" href="docsignal_interesse.html">Solicitar proposta</a>
+          <p style="font-size:0.9rem; margin-top:14px;">Diagnósticos a partir de R$ 900 ou Start Mensal por R$ 3.000.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>DocSignal | Inteligência documental para auditoria, risco e prevenção de perdas.</span>
+      <span>Alertas indicam risco e priorização; confirmação depende da auditoria interna.</span>
+    </div>
+  </footer>
+
+  <script>
+    const canvas = document.getElementById("signalCanvas");
+    const ctx = canvas.getContext("2d");
+    let width = 0;
+    let height = 0;
+    const docs = [];
+
+    function resize() {
+      const ratio = window.devicePixelRatio || 1;
+      width = canvas.offsetWidth;
+      height = canvas.offsetHeight;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      seedDocs();
+    }
+
+    function seedDocs() {
+      docs.length = 0;
+      const count = Math.max(18, Math.floor(width / 70));
+      for (let i = 0; i < count; i++) {
+        docs.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          w: 54 + Math.random() * 34,
+          h: 72 + Math.random() * 48,
+          vx: -0.14 + Math.random() * 0.28,
+          vy: -0.08 + Math.random() * 0.16,
+          hue: Math.random() > 0.72 ? "amber" : Math.random() > 0.46 ? "cyan" : "blue",
+          score: 50 + Math.floor(Math.random() * 49)
+        });
+      }
+    }
+
+    function color(doc, alpha) {
+      if (doc.hue === "amber") return `rgba(216, 155, 55, ${alpha})`;
+      if (doc.hue === "cyan") return `rgba(92, 200, 255, ${alpha})`;
+      return `rgba(95, 150, 216, ${alpha})`;
+    }
+
+    function drawDoc(doc) {
+      ctx.save();
+      ctx.translate(doc.x, doc.y);
+      ctx.fillStyle = "rgba(248, 251, 255, 0.08)";
+      ctx.strokeStyle = color(doc, 0.48);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, doc.w, doc.h, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(248, 251, 255, 0.18)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(12, 22 + i * 14);
+        ctx.lineTo(doc.w - 12, 22 + i * 14);
+        ctx.stroke();
+      }
+      ctx.fillStyle = color(doc, 0.9);
+      ctx.font = "800 12px Inter, sans-serif";
+      ctx.fillText(String(doc.score), 12, doc.h - 14);
+      ctx.restore();
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#07111f";
+      ctx.fillRect(0, 0, width, height);
+
+      for (let i = 0; i < docs.length; i++) {
+        const a = docs[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.x < -120) a.x = width + 40;
+        if (a.x > width + 120) a.x = -40;
+        if (a.y < -120) a.y = height + 40;
+        if (a.y > height + 120) a.y = -40;
+
+        for (let j = i + 1; j < docs.length; j++) {
+          const b = docs[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 210) {
+            ctx.strokeStyle = `rgba(92, 200, 255, ${0.12 * (1 - dist / 210)})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x + a.w / 2, a.y + a.h / 2);
+            ctx.lineTo(b.x + b.w / 2, b.y + b.h / 2);
+            ctx.stroke();
+          }
+        }
+      }
+
+      docs.forEach(drawDoc);
+      requestAnimationFrame(animate);
+    }
+
+    if (CanvasRenderingContext2D.prototype.roundRect) {
+      resize();
+      animate();
+      window.addEventListener("resize", resize);
+    }
+  </script>
+</body>
+</html>

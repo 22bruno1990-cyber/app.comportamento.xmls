@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DocSmart | Diagnósticos rápidos para planilhas financeiras</title>
+  <meta name="description" content="DocSmart transforma planilhas e bases exportadas em diagnósticos rápidos para organizar, conferir pagamentos, cobrar clientes, preparar pacote contábil assistido e acompanhar mensalmente.">
+  <style>
+    :root {
+      --ink: #07111f;
+      --navy: #102844;
+      --blue: #2f73c6;
+      --cyan: #5cc8ff;
+      --amber: #d89b37;
+      --green: #4fa37b;
+      --paper: #f8fbff;
+      --muted: #64758c;
+      --line: rgba(16, 40, 68, 0.14);
+      --shadow: 0 22px 70px rgba(7, 17, 31, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f3f7fb;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      background: rgba(7, 17, 31, 0.86);
+      backdrop-filter: blur(18px);
+      color: #f8fbff;
+      border-bottom: 1px solid rgba(248, 251, 255, 0.12);
+    }
+
+    .nav {
+      width: min(1160px, calc(100% - 40px));
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+    }
+    .brand img {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: #f8fbff;
+      display: block;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      color: rgba(248, 251, 255, 0.78);
+      font-size: 0.92rem;
+    }
+    .nav-links a:hover { color: #fff; }
+
+    .button {
+      min-height: 44px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(248, 251, 255, 0.24);
+      background: #f8fbff;
+      color: var(--ink);
+      font-weight: 850;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .button.secondary {
+      background: rgba(248, 251, 255, 0.08);
+      color: #f8fbff;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 82vh;
+      padding: 104px 0 72px;
+      overflow: hidden;
+      color: #f8fbff;
+      background:
+        linear-gradient(135deg, rgba(7, 17, 31, 0.98), rgba(16, 40, 68, 0.94)),
+        radial-gradient(circle at 78% 22%, rgba(92, 200, 255, 0.24), transparent 34%),
+        radial-gradient(circle at 80% 92%, rgba(216, 155, 55, 0.16), transparent 32%);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(92, 200, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(92, 200, 255, 0.12) 1px, transparent 1px);
+      background-size: 88px 88px;
+      opacity: 0.36;
+    }
+    .wrap {
+      width: min(1160px, calc(100% - 40px));
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+      gap: 44px;
+      align-items: center;
+    }
+    .eyebrow {
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 900;
+      font-size: 0.8rem;
+    }
+    h1 {
+      margin: 18px 0 0;
+      max-width: 780px;
+      font-size: clamp(3rem, 6vw, 6.4rem);
+      line-height: 0.92;
+      letter-spacing: 0;
+    }
+    .lead {
+      margin: 28px 0 0;
+      max-width: 700px;
+      color: rgba(248, 251, 255, 0.82);
+      font-size: clamp(1.08rem, 2vw, 1.32rem);
+    }
+    .actions {
+      margin-top: 32px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .demo-panel {
+      background: rgba(248, 251, 255, 0.08);
+      border: 1px solid rgba(248, 251, 255, 0.16);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      border-radius: 8px;
+    }
+    .sheet-head {
+      display: grid;
+      grid-template-columns: 1.3fr 0.8fr 0.8fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .sheet-head span,
+    .sheet-row span {
+      min-height: 34px;
+      border-radius: 6px;
+      padding: 8px;
+      background: rgba(248, 251, 255, 0.12);
+      color: rgba(248, 251, 255, 0.82);
+      font-size: 0.84rem;
+    }
+    .sheet-head span {
+      background: rgba(92, 200, 255, 0.18);
+      color: #f8fbff;
+      font-weight: 850;
+    }
+    .sheet-row {
+      display: grid;
+      grid-template-columns: 1.3fr 0.8fr 0.8fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .score {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .score div {
+      background: #f8fbff;
+      color: var(--ink);
+      padding: 14px;
+      border-radius: 8px;
+      min-height: 86px;
+    }
+    .score strong {
+      display: block;
+      font-size: 1.8rem;
+      line-height: 1;
+      color: var(--blue);
+    }
+    .score span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    section { padding: 76px 0; }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 26px;
+      margin-bottom: 28px;
+    }
+    .section-head h2 {
+      margin: 0;
+      max-width: 720px;
+      color: var(--navy);
+      font-size: clamp(2rem, 4vw, 3.6rem);
+      line-height: 1;
+    }
+    .section-head p {
+      margin: 0;
+      max-width: 430px;
+      color: var(--muted);
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 16px;
+    }
+    .module-cards {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      align-items: stretch;
+    }
+    .monthly-card {
+      margin-top: 16px;
+      grid-template-columns: 1fr;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 12px 40px rgba(7, 17, 31, 0.08);
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 238px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h3 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 1.25rem;
+    }
+    .card p,
+    .card li {
+      color: var(--muted);
+    }
+    .module-cards .card > p:first-of-type {
+      min-height: 132px;
+      margin-bottom: 0;
+    }
+    .module-cards .card > p:last-of-type {
+      min-height: 72px;
+      margin-top: 16px;
+    }
+    .card ul {
+      padding-left: 18px;
+      margin: 16px 0 0;
+    }
+    .price {
+      margin-top: auto;
+      color: var(--blue);
+      font-weight: 950;
+      font-size: 2rem;
+      line-height: 1;
+    }
+    .pricing-panel {
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 12px 40px rgba(7, 17, 31, 0.08);
+    }
+    .pricing-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .pricing-table th,
+    .pricing-table td {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      color: var(--navy);
+      vertical-align: top;
+    }
+    .pricing-table th {
+      background: #eef5fc;
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .pricing-table td:not(:first-child),
+    .pricing-table th:not(:first-child) {
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 900;
+    }
+    .pricing-table tr:last-child td {
+      border-bottom: 0;
+    }
+    .pricing-note {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 18px;
+      color: var(--muted);
+      background: #f8fbff;
+      border-top: 1px solid var(--line);
+    }
+    .pricing-note strong {
+      color: var(--navy);
+    }
+    .policy-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .policy {
+      min-height: 178px;
+      padding: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 28px rgba(7, 17, 31, 0.06);
+      display: flex;
+      flex-direction: column;
+    }
+    .policy strong {
+      display: block;
+      color: var(--navy);
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    .policy em {
+      display: block;
+      margin-top: auto;
+      color: var(--blue);
+      font-style: normal;
+      font-weight: 950;
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    .policy span {
+      color: var(--muted);
+    }
+    .selector-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .module-selector-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    .selector.monthly-selector {
+      grid-column: 1 / -1;
+      min-height: 140px;
+    }
+    .selector {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 210px;
+      box-shadow: 0 12px 36px rgba(7, 17, 31, 0.07);
+    }
+    .selector strong {
+      display: block;
+      color: var(--navy);
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+    }
+    .selector span {
+      display: inline-flex;
+      margin-top: 16px;
+      color: var(--blue);
+      font-weight: 900;
+    }
+    .selector p {
+      margin: 0;
+      color: var(--muted);
+    }
+    .band {
+      background: var(--ink);
+      color: #f8fbff;
+    }
+    .band .section-head h2 { color: #f8fbff; }
+    .band .section-head p { color: rgba(248, 251, 255, 0.72); }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .step {
+      border: 1px solid rgba(248, 251, 255, 0.14);
+      background: rgba(248, 251, 255, 0.08);
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 150px;
+    }
+    .step strong {
+      display: block;
+      color: var(--cyan);
+      font-size: 1.7rem;
+      margin-bottom: 12px;
+    }
+    .step span {
+      color: rgba(248, 251, 255, 0.82);
+    }
+    .compare {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .compare .card:first-child {
+      border-top: 6px solid var(--green);
+    }
+    .compare .card:last-child {
+      border-top: 6px solid var(--blue);
+    }
+    .cta {
+      background: #e9f2fb;
+    }
+    .cta-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 34px;
+      box-shadow: var(--shadow);
+    }
+    .cta-box h2 {
+      margin: 0;
+      color: var(--navy);
+      font-size: clamp(2rem, 4vw, 3.6rem);
+      line-height: 1;
+    }
+    .cta-box p {
+      margin: 14px 0 0;
+      color: var(--muted);
+      max-width: 650px;
+    }
+    footer {
+      padding: 28px 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer .wrap {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .nav-links { display: none; }
+      .hero-grid,
+      .cards,
+      .module-cards,
+      .selector-grid,
+      .module-selector-grid,
+      .steps,
+      .policy-grid,
+      .compare,
+      .cta-box {
+        grid-template-columns: 1fr;
+      }
+      .hero-grid { display: block; }
+      .demo-panel { margin-top: 34px; }
+      .section-head {
+        display: block;
+      }
+      .section-head p { margin-top: 14px; }
+      .steps { display: grid; }
+      .pricing-panel { overflow-x: auto; }
+      .pricing-note { display: block; }
+      .pricing-note span {
+        display: block;
+        margin-top: 8px;
+      }
+      .cta-box { display: grid; }
+      h1 { font-size: 3.2rem; }
+      footer .wrap { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav">
+      <a class="brand" href="#top">
+        <img src="assets/docsignal-mark.svg" alt="DocSmart">
+        <span>DocSmart</span>
+      </a>
+      <div class="nav-links">
+        <a href="#entrega">Entrega</a>
+        <a href="#pacotes">Módulos</a>
+        <a href="#mensalidade">Mensalidade</a>
+        <a href="#docsignal">DocSignal</a>
+        <a class="button" href="#começar">Começar</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow">DOC Suite · Controle de Operações Documentais</div>
+          <h1>Organize, confira e cobre usando suas planilhas.</h1>
+          <p class="lead">
+            O DocSmart é uma família de diagnósticos rápidos para transformar planilhas e bases exportadas em painel,
+            alertas e próximos passos, sem implantação e sem trocar o ERP.
+          </p>
+          <div class="actions">
+            <a class="button" href="#pacotes">Ver módulos</a>
+            <a class="button secondary" href="#mensalidade">Ver mensalidade</a>
+          </div>
+        </div>
+
+        <aside class="demo-panel" aria-label="Prévia de painel DocSmart">
+          <div class="sheet-head">
+            <span>Fornecedor</span>
+            <span>Valor</span>
+            <span>Alerta</span>
+          </div>
+          <div class="sheet-row">
+            <span>Fornecedor Alpha</span>
+            <span>R$ 1.250</span>
+            <span>Duplicidade</span>
+          </div>
+          <div class="sheet-row">
+            <span>Fornecedor Gama</span>
+            <span>R$ 6.100</span>
+            <span>Fora do padrão</span>
+          </div>
+          <div class="sheet-row">
+            <span>Fornecedor Beta</span>
+            <span>R$ 810</span>
+            <span>Mensal</span>
+          </div>
+          <div class="score">
+            <div><strong>72h</strong><span>prazo de entrega</span></div>
+            <div><strong>1k</strong><span>linhas no módulo Planilhas</span></div>
+            <div><strong>R$600</strong><span>entrada inicial</span></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="entrega">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>O que você envia e recebe.</h2>
+          <p>Uma oferta simples para quem tem planilha, mas não tem tempo para garimpar alerta manualmente.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Entrada</h3>
+            <ul>
+              <li>1 planilha Excel, CSV ou Google Sheets exportado.</li>
+              <li>Contexto da base e objetivo principal.</li>
+              <li>Colunas como data, valor, fornecedor, cliente, descrição ou status.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Análise</h3>
+            <ul>
+              <li>Duplicidades e repetições.</li>
+              <li>Maiores fornecedores, clientes e valores.</li>
+              <li>Valores fora do padrão.</li>
+              <li>Visão por mês, status ou categoria.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Entrega</h3>
+            <ul>
+              <li>Dashboard resumido.</li>
+              <li>Aba de alertas.</li>
+              <li>Resumo executivo dos achados.</li>
+              <li>Reunião de devolutiva de até 30 minutos.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="modulo-certo">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Qual módulo combina com o desafio operacional?</h2>
+          <p>Escolha o diagnóstico conforme a rotina que mais precisa de clareza agora.</p>
+        </div>
+        <div class="selector-grid module-selector-grid">
+          <a class="selector" href="#pacotes">
+            <strong>Minha planilha está manual e bagunçada.</strong>
+            <p>Preciso de painel, alertas, ranking e resumo executivo.</p>
+            <span>Planilhas</span>
+          </a>
+          <a class="selector" href="#pacotes">
+            <strong>Perco datas de vencimento no mês.</strong>
+            <p>Quero calendário financeiro, alertas e mensagens prontas.</p>
+            <span>Agenda</span>
+          </a>
+          <a class="selector" href="#pacotes">
+            <strong>Não sei se essa NF já foi paga.</strong>
+            <p>Quero cruzar NFs/contas a pagar com extrato exportado.</p>
+            <span>Pagamentos</span>
+          </a>
+          <a class="selector" href="#pacotes">
+            <strong>Não sei quem ainda não pagou.</strong>
+            <p>Quero cruzar contas a receber com recebimentos.</p>
+            <span>Cobrança</span>
+          </a>
+          <a class="selector" href="#pacotes">
+            <strong>Meu contador recebe tudo espalhado.</strong>
+            <p>Quero entradas e saídas organizadas para validação contábil.</p>
+            <span>Fiscal Assist</span>
+          </a>
+          <a class="selector monthly-selector" href="#mensalidade">
+            <strong>Preciso acompanhar todo mês.</strong>
+            <p>Quero atualizar a base e acompanhar evolução dos alertas.</p>
+            <span>Mensal</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Fluxo simples, rápido e objetivo.</h2>
+          <p>O DocSmart começa pequeno: escolha o módulo conforme o desafio operacional, envie as bases e receba um diagnóstico objetivo.</p>
+        </div>
+        <div class="steps">
+          <div class="step"><strong>1</strong><span>Cliente envia amostra ou print das colunas.</span></div>
+          <div class="step"><strong>2</strong><span>Confirmamos se a base permite análise.</span></div>
+          <div class="step"><strong>3</strong><span>Definimos o módulo: Planilhas, Pagamentos, Cobrança, Agenda, Fiscal Assist ou Mensal.</span></div>
+          <div class="step"><strong>4</strong><span>Pagamento e recebimento da planilha final.</span></div>
+          <div class="step"><strong>5</strong><span>Entrega com dashboard, alertas e devolutiva.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pacotes">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Escolha o módulo pelo desafio.</h2>
+          <p>Cada módulo resolve uma rotina específica para você começar pelo ponto mais importante.</p>
+        </div>
+        <div class="cards module-cards">
+          <article class="card">
+            <h3>Planilhas</h3>
+            <p>Transforma uma planilha financeira, operacional ou documental em dashboard, alertas e resumo executivo.</p>
+            <div class="price">R$ 600</div>
+            <p>Até 1.000 linhas, entrega em até 72h.</p>
+          </article>
+          <article class="card">
+            <h3>Agenda</h3>
+            <p>Transforma vencimentos a pagar e receber em calendário financeiro, alertas e mensagens prontas para ação.</p>
+            <div class="price">R$ 600</div>
+            <p>Uma base de vencimentos, entrega em até 72h.</p>
+          </article>
+          <article class="card">
+            <h3>Pagamentos</h3>
+            <p>Cruza NFs/contas a pagar com extrato exportado para mostrar o que foi pago, pendente ou divergente.</p>
+            <div class="price">R$ 700</div>
+            <p>Até 1.000 linhas somadas, entrega em até 72h.</p>
+          </article>
+          <article class="card">
+            <h3>Cobrança</h3>
+            <p>Cruza NFs emitidas ou contas a receber com recebimentos para mostrar quem ainda não pagou.</p>
+            <div class="price">R$ 700</div>
+            <p>Até 1.000 linhas somadas, entrega em até 72h.</p>
+          </article>
+          <article class="card">
+            <h3>Fiscal Assist</h3>
+            <p>Organiza entradas, saídas, categorias sugeridas e pontos de validação em pacote técnico para o contador.</p>
+            <div class="price">R$ 900</div>
+            <p>Até 1.000 linhas, CRC/e-mail contábil obrigatório e entrega em até 72h.</p>
+          </article>
+        </div>
+        <div class="cards monthly-card">
+          <article class="card">
+            <h3>DocSmart Mensal</h3>
+            <p>Acompanhamento mensal de um ou mais módulos, com atualização da base, painel e reunião curta de acompanhamento.</p>
+            <div class="price">a partir de R$ 900/mês</div>
+            <p>1 módulo até 1.000 linhas/mês. Completo operacional a partir de R$ 2.200/mês. Completo com Fiscal Assist a partir de R$ 2.800/mês.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="mensalidade">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Mensalidade por volume.</h2>
+          <p>Você escolhe quantos módulos usa e o volume mensal de linhas. Assim o acompanhamento fica proporcional à rotina da empresa.</p>
+        </div>
+        <div class="pricing-panel">
+          <table class="pricing-table" aria-label="Tabela de mensalidade por módulos e volume">
+            <thead>
+              <tr>
+                <th>Uso mensal</th>
+                <th>Até 1.000 linhas</th>
+                <th>Até 3.000 linhas</th>
+                <th>Até 5.000 linhas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1 módulo</td>
+                <td>R$ 900/mês</td>
+                <td>R$ 1.500/mês</td>
+                <td>R$ 2.200/mês</td>
+              </tr>
+              <tr>
+                <td>2 módulos</td>
+                <td>R$ 1.400/mês</td>
+                <td>R$ 2.200/mês</td>
+                <td>R$ 3.200/mês</td>
+              </tr>
+              <tr>
+                <td>3 módulos</td>
+                <td>R$ 1.800/mês</td>
+                <td>R$ 2.900/mês</td>
+                <td>R$ 4.200/mês</td>
+              </tr>
+              <tr>
+                <td>Completo operacional</td>
+                <td>R$ 2.200/mês</td>
+                <td>R$ 3.600/mês</td>
+                <td>R$ 5.200/mês</td>
+              </tr>
+              <tr>
+                <td>Completo + Fiscal Assist</td>
+                <td>R$ 2.800/mês</td>
+                <td>R$ 4.500/mês</td>
+                <td>R$ 6.500/mês</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pricing-note">
+            <strong>Acima de 5.000 linhas/mês vira proposta sob medida.</strong>
+            <span>Linhas somadas entre todas as bases enviadas no mês. Há tolerância operacional de 10%; acima disso, cobra-se no mês a diferença para a faixa correspondente.</span>
+          </div>
+        </div>
+        <div class="policy-grid">
+          <div class="policy">
+            <strong>Excedente</strong>
+            <span>Se o volume passar da tolerância, a cobrança adicional é a diferença entre a faixa contratada e a faixa efetivamente usada no mês.</span>
+            <em>10%</em>
+          </div>
+          <div class="policy">
+            <strong>Ciclo mínimo</strong>
+            <span>Tempo necessário para organizar a base, comparar períodos e gerar rotina de acompanhamento.</span>
+            <em>3 meses</em>
+          </div>
+          <div class="policy">
+            <strong>Crédito</strong>
+            <span>Fechando mensal em até 7 dias após a entrega, 50% do diagnóstico vira crédito na primeira mensalidade.</span>
+            <em>50%</em>
+          </div>
+          <div class="policy">
+            <strong>Cancelamento</strong>
+            <span>Depois do 3º mês, cancelamento com aviso prévio de 30 dias.</span>
+            <em>30 dias</em>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="docsignal" class="cta">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>DocSmart abre a porta. DocSignal escala a rotina.</h2>
+          <p>Quando sua rotina tem XMLs recorrentes, histórico, score estruturado e fila de tratativa, o caminho natural é evoluir para DocSignal.</p>
+        </div>
+        <div class="compare">
+          <article class="card">
+            <h3>DocSmart</h3>
+            <ul>
+              <li>Módulos de Planilhas, Pagamentos, Cobrança e Agenda.</li>
+              <li>Fiscal Assist para pacote técnico ao contador.</li>
+              <li>Entrega rápida com base exportada.</li>
+              <li>Dashboard, alertas e resumo.</li>
+              <li>Ideal para diagnóstico rápido e validação inicial.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>DocSignal</h3>
+            <ul>
+              <li>Plataforma com upload.</li>
+              <li>Score, histórico e fila de tratativa.</li>
+              <li>Painel executivo e exportações.</li>
+              <li>Ideal para rotina mensal e ticket maior.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="começar" class="cta">
+      <div class="wrap">
+        <div class="cta-box">
+          <div>
+            <h2>Comece com uma planilha.</h2>
+          <p>O próximo passo é simples: envie uma amostra ou print das colunas. Se a base tiver dados suficientes, indicamos o módulo certo: Planilhas, Pagamentos, Cobrança, Agenda ou Fiscal Assist.</p>
+          </div>
+          <a class="button" href="#pacotes">Ver módulos</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>DocSmart | Diagnósticos rápidos para planilhas financeiras.</span>
+      <span>Organiza sinais de atenção; não substitui ERP, auditoria ou validação jurídica/fiscal.</span>
+    </div>
+  </footer>
+</body>
+</html>

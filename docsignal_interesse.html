@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DocSignal | Avaliar documentos</title>
+  <meta name="description" content="Solicite uma avaliação documental com o DocSignal para priorizar riscos em XMLs e planilhas.">
+  <style>
+    :root {
+      --ink: #07111f;
+      --navy: #102844;
+      --blue: #2f73c6;
+      --cyan: #5cc8ff;
+      --paper: #f8fbff;
+      --muted: #62738a;
+      --line: rgba(16, 40, 68, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 12%, rgba(92, 200, 255, 0.18), transparent 24%),
+        radial-gradient(circle at 82% 18%, rgba(47, 115, 198, 0.18), transparent 24%),
+        linear-gradient(180deg, #f6f9fd 0%, #eef4fb 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .topbar {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(16, 40, 68, 0.08);
+      background: rgba(248, 251, 255, 0.82);
+      backdrop-filter: blur(16px);
+    }
+
+    .nav {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: block;
+      background: var(--ink);
+      overflow: hidden;
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .nav-link {
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 800;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 64px 0;
+      display: grid;
+      grid-template-columns: 0.92fr 1.08fr;
+      gap: 36px;
+      align-items: start;
+    }
+
+    .intro {
+      position: sticky;
+      top: 32px;
+      padding: 36px;
+      min-height: 620px;
+      border-radius: 8px;
+      color: #f8fbff;
+      background: linear-gradient(135deg, #07111f, #102844 58%, #173761);
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(7, 17, 31, 0.18);
+    }
+
+    .intro::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -12% 20%;
+      height: 260px;
+      background:
+        linear-gradient(120deg, transparent 0 18%, rgba(92, 200, 255, 0.24) 18% 22%, transparent 22% 38%, rgba(248, 251, 255, 0.16) 38% 42%, transparent 42% 100%);
+      transform: rotate(-8deg);
+      opacity: 0.9;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #cfe4ff;
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 28px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--cyan);
+    }
+
+    h1 {
+      margin: 22px 0 0;
+      font-size: clamp(2.6rem, 6vw, 5.4rem);
+      line-height: 0.94;
+      letter-spacing: 0;
+    }
+
+    .intro-copy {
+      margin-top: 24px;
+      color: rgba(248, 251, 255, 0.78);
+      font-size: 1.05rem;
+      max-width: 620px;
+    }
+
+    .proof-list {
+      position: relative;
+      z-index: 2;
+      margin-top: 32px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .proof-item {
+      border: 1px solid rgba(248, 251, 255, 0.14);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(248, 251, 255, 0.08);
+      color: rgba(248, 251, 255, 0.82);
+    }
+
+    .proof-item strong {
+      display: block;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .form-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 28px;
+      box-shadow: 0 18px 50px rgba(7, 17, 31, 0.09);
+    }
+
+    .form-head {
+      margin-bottom: 24px;
+    }
+
+    .form-head h2 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      line-height: 1;
+    }
+
+    .form-head p {
+      color: var(--muted);
+      margin: 12px 0 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      font-weight: 900;
+      font-size: 0.88rem;
+      color: #1c2e4a;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(16, 40, 68, 0.14);
+      border-radius: 8px;
+      padding: 12px 13px;
+      color: var(--ink);
+      background: #fbfdff;
+      font: inherit;
+      min-height: 46px;
+    }
+
+    textarea {
+      min-height: 112px;
+      resize: vertical;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: 3px solid rgba(47, 115, 198, 0.16);
+      border-color: var(--blue);
+    }
+
+    .checks {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      border: 1px solid rgba(16, 40, 68, 0.1);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .check input {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    button,
+    .secondary {
+      border: 0;
+      border-radius: 8px;
+      min-height: 48px;
+      padding: 13px 18px;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    button {
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), #173761);
+    }
+
+    .secondary {
+      color: var(--ink);
+      background: #eef4fb;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .helper {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .status {
+      margin-top: 14px;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: none;
+      background: #e9f7ef;
+      color: #14532d;
+      font-weight: 800;
+    }
+
+    @media (max-width: 880px) {
+      main {
+        grid-template-columns: 1fr;
+        padding-top: 34px;
+      }
+      .intro {
+        position: relative;
+        top: auto;
+        min-height: auto;
+      }
+      .grid,
+      .checks {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav" aria-label="Navegação principal">
+      <a class="brand" href="docsignal_landing.html" aria-label="DocSignal">
+        <span class="brand-mark"><img src="assets/docsignal-mark.svg" alt=""></span>
+        <span>DocSignal</span>
+      </a>
+      <a class="nav-link" href="docsignal_landing.html">Ver apresentação</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro" aria-label="DocSignal">
+      <div class="eyebrow">Avaliação documental</div>
+      <h1>Quer saber onde olhar primeiro?</h1>
+      <p class="intro-copy">
+        Preencha um resumo do seu cenário. O DocSignal ajuda a priorizar sinais de risco em XMLs e planilhas,
+        sem substituir auditoria interna ou ERP.
+      </p>
+      <div class="proof-list">
+        <div class="proof-item"><strong>Entrada leve</strong> diagnóstico a partir de lote fechado.</div>
+        <div class="proof-item"><strong>Start Mensal</strong> rotina assistida para quem já tem volume recorrente.</div>
+        <div class="proof-item"><strong>Sem promessa vazia</strong> alertas indicam sinais para revisão, não confirmação automática de fraude.</div>
+      </div>
+    </section>
+
+    <section class="form-card" aria-label="Formulário de interesse">
+      <div class="form-head">
+        <h2>Solicitar avaliação</h2>
+        <p>O envio abre um e-mail preenchido com as suas respostas. Você revisa e envia pelo seu próprio e-mail.</p>
+      </div>
+
+      <form id="interestForm">
+        <div class="grid">
+          <div class="field">
+            <label for="name">Seu nome</label>
+            <input id="name" name="name" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="company">Empresa</label>
+            <input id="company" name="company" autocomplete="organization" required>
+          </div>
+          <div class="field">
+            <label for="email">E-mail corporativo</label>
+            <input id="email" name="email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="phone">WhatsApp</label>
+            <input id="phone" name="phone" autocomplete="tel">
+          </div>
+          <div class="field">
+            <label for="segment">Segmento</label>
+            <select id="segment" name="segment" required>
+              <option value="">Selecione</option>
+              <option>Contas a pagar / financeiro</option>
+              <option>Operações / OS / manutenção</option>
+              <option>Saúde / auditoria / prestadores</option>
+              <option>BPO financeiro / contabilidade</option>
+              <option>Outro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="volume">Volume aproximado</label>
+            <select id="volume" name="volume" required>
+              <option value="">Selecione</option>
+              <option>Até 100 documentos/mês</option>
+              <option>101 a 250 documentos/mês</option>
+              <option>251 a 500 documentos/mês</option>
+              <option>501 a 1.000 documentos/mês</option>
+              <option>Acima de 1.000 documentos/mês</option>
+              <option>Ainda não sei</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>Tipos de arquivo usados hoje</label>
+          <div class="checks">
+            <label class="check"><input type="checkbox" name="files" value="XML NF-e"> XML NF-e</label>
+            <label class="check"><input type="checkbox" name="files" value="Planilha CSV/XLSX"> Planilha CSV/XLSX</label>
+            <label class="check"><input type="checkbox" name="files" value="PDF"> PDF</label>
+            <label class="check"><input type="checkbox" name="files" value="Imagem/comprovante"> Imagem/comprovante</label>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label for="pain">Maior dor hoje</label>
+          <select id="pain" name="pain" required>
+            <option value="">Selecione</option>
+            <option>Duplicidade ou pagamento repetido</option>
+            <option>Reapresentação de documento</option>
+            <option>Conferência manual demais</option>
+            <option>Referência interna repetida</option>
+            <option>Fracionamento de cobrança</option>
+            <option>Não sei onde priorizar revisão</option>
+            <option>Outro</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label for="goal">O que você gostaria de avaliar?</label>
+          <textarea id="goal" name="goal" placeholder="Ex.: revisar um lote de XMLs de fornecedores, avaliar planilha de contas a pagar, identificar duplicidades em OS..."></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit">Gerar e-mail de solicitação</button>
+          <a class="secondary" href="docsignal_landing.html">Ver apresentação</a>
+        </div>
+        <div class="helper">
+          Diagnósticos começam em R$ 900. Start Mensal: R$ 3.000 para até 500 documentos no primeiro mês assistido.
+        </div>
+        <div id="status" class="status">E-mail preparado. Se o aplicativo de e-mail não abrir, copie as informações do formulário e envie manualmente.</div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("interestForm");
+    const statusBox = document.getElementById("status");
+    const destination = "contato@docsignal.com.br";
+
+    function formValue(id) {
+      return document.getElementById(id).value.trim() || "Nao informado";
+    }
+
+    function selectedFiles() {
+      return Array.from(document.querySelectorAll('input[name="files"]:checked'))
+        .map((item) => item.value)
+        .join(", ") || "Nao informado";
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const company = formValue("company");
+      const subject = `Interesse DocSignal - ${company}`;
+      const body = [
+        "Ola, tenho interesse em avaliar o DocSignal.",
+        "",
+        `Nome: ${formValue("name")}`,
+        `Empresa: ${company}`,
+        `E-mail corporativo: ${formValue("email")}`,
+        `WhatsApp: ${formValue("phone")}`,
+        `Segmento: ${formValue("segment")}`,
+        `Volume aproximado: ${formValue("volume")}`,
+        `Tipos de arquivo: ${selectedFiles()}`,
+        `Maior dor: ${formValue("pain")}`,
+        "",
+        "O que gostaria de avaliar:",
+        formValue("goal"),
+        "",
+        "Gostaria de entender qual formato faz mais sentido: diagnostico pontual ou Start Mensal."
+      ].join("\n");
+
+      const mailto = `mailto:${destination}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      statusBox.style.display = "block";
+      window.location.href = mailto;
+    });
+  </script>
+</body>
+</html>

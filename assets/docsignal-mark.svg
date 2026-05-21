@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">DocSignal</title>
+  <desc id="desc">Technology mark combining document, behavioral signal and motion paths</desc>
+  <defs>
+    <linearGradient id="bg" x1="84" y1="68" x2="430" y2="454" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111f"/>
+      <stop offset=".52" stop-color="#102844"/>
+      <stop offset="1" stop-color="#173761"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="146" y1="126" x2="364" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="92" y1="136" x2="430" y2="376" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5cc8ff"/>
+      <stop offset=".55" stop-color="#7fa7d8"/>
+      <stop offset="1" stop-color="#d89b37"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.36 0 0 0 0 0.78 0 0 0 0 1 0 0 0 .65 0"/>
+      <feBlend in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <path d="M82 154c78-62 164-78 256-48 36 12 67 31 92 56" fill="none" stroke="#5cc8ff" stroke-width="16" stroke-linecap="round" opacity=".24"/>
+  <path d="M72 244c60-46 124-62 190-48 64 14 112 56 176 76" fill="none" stroke="#7fa7d8" stroke-width="12" stroke-linecap="round" opacity=".22"/>
+  <path d="M142 118h154l74 76v198H142V118z" fill="url(#sheet)"/>
+  <path d="M296 118v76h74" fill="#bcd8ff"/>
+  <path d="M186 236h126M186 284h146M186 332h80" stroke="#173761" stroke-width="20" stroke-linecap="round"/>
+  <path d="M94 372c54-64 126-94 216-90 48 2 86 18 120 45" fill="none" stroke="url(#signal)" stroke-width="24" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M106 314c50-38 106-55 168-50 52 5 96 25 132 58" fill="none" stroke="#5cc8ff" stroke-width="12" stroke-linecap="round" opacity=".74"/>
+  <circle cx="310" cy="282" r="23" fill="#07111f"/>
+  <circle cx="310" cy="282" r="11" fill="#5cc8ff"/>
+  <circle cx="394" cy="328" r="18" fill="#d89b37"/>
+  <circle cx="116" cy="374" r="14" fill="#5cc8ff"/>
+  <path d="M118 374l192-92 84 46" fill="none" stroke="#f8fbff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".72"/>
+</svg>
