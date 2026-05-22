@@ -1167,47 +1167,87 @@ def render_collection_draft(agenda):
         agenda["_tipo_agenda"].astype(str).str.lower().str.contains("receber", na=False)
         & agenda["_faixa"].isin(["Vencido", "Vence hoje", "Próximos 7 dias"])
     ].copy()
+    treated_keys = set(st.session_state.get("agenda_treated_contacts", []))
+    receivables["_contact_key"] = (
+        receivables["_nome_agenda"].astype(str)
+        + "|"
+        + receivables["_documento_agenda"].astype(str)
+        + "|"
+        + receivables["_data_detectada"].astype(str)
+    )
+    receivables = receivables[~receivables["_contact_key"].isin(treated_keys)].copy()
     if receivables.empty:
+        st.success("Todas as pendências de contato desta sessão foram tratadas.")
         return
 
+    receivables["_grupo_contato"] = "Próximos ao vencimento"
+    receivables.loc[receivables["_faixa"].isin(["Vencido", "Vence hoje"]), "_grupo_contato"] = "Em atraso"
     receivables = receivables.sort_values(["_dias_para_vencer", "_valor_detectado"], ascending=[True, False])
+    group = st.segmented_control(
+        "Fila de contato",
+        ["Em atraso", "Próximos ao vencimento", "Todos"],
+        default="Em atraso",
+        key="agenda_contact_group",
+    )
+    filtered = receivables if group == "Todos" else receivables[receivables["_grupo_contato"].eq(group)]
+    if filtered.empty:
+        st.info(f"Sem pendências em '{group}' nesta sessão.")
+        return
+
     labels = []
-    for idx, row in receivables.iterrows():
+    for idx, row in filtered.iterrows():
         date_txt = row["_data_detectada"].strftime("%d/%m/%Y") if pd.notna(row["_data_detectada"]) else "sem data"
         labels.append(
-            f"{row.get('_nome_agenda', 'Cliente')} · {row.get('_documento_agenda', 'Documento')} · "
+            f"{row.get('_grupo_contato', 'Contato')} · {row.get('_nome_agenda', 'Cliente')} · {row.get('_documento_agenda', 'Documento')} · "
             f"{currency(row.get('_valor_detectado', 0))} · {date_txt} · {row.get('_faixa', '')}"
         )
 
     st.markdown(
         """
         <div class="draft-box">
-          <strong>Rascunho de cobrança respeitosa</strong>
-          <span>Selecione um recebimento pendente para gerar uma mensagem pronta para e-mail.</span>
+          <strong>Fila de contato e rascunho de cobrança</strong>
+          <span>Use atraso para cobrança direta e próximos vencimentos para contato preventivo.</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
     selected_label = st.selectbox("Pendência para contato", labels, key="agenda_draft_item")
-    selected = receivables.iloc[labels.index(selected_label)]
+    selected = filtered.iloc[labels.index(selected_label)]
     client = str(selected.get("_nome_agenda", "cliente")).strip() or "cliente"
     document = str(selected.get("_documento_agenda", "documento")).strip() or "documento"
     value = currency(selected.get("_valor_detectado", 0))
     due_date = selected["_data_detectada"].strftime("%d/%m/%Y") if pd.notna(selected["_data_detectada"]) else "data não identificada"
-    subject = f"Alinhamento sobre pendência {document}"
-    draft = (
-        f"Olá, {client}. Tudo bem?\n\n"
-        f"Identificamos em nossa conferência financeira que o compromisso referente ao {document}, "
-        f"no valor de {value}, com vencimento em {due_date}, ainda consta como pendente em nossa base.\n\n"
-        "Você poderia, por gentileza, nos confirmar se houve algum problema no processamento, "
-        "se o pagamento já foi realizado por outro meio, ou se existe alguma previsão para regularização?\n\n"
-        "Nosso objetivo é apenas alinhar a informação e manter o controle financeiro atualizado.\n\n"
-        "Fico à disposição.\n"
-        "Obrigado."
-    )
+    is_overdue = selected.get("_grupo_contato") == "Em atraso"
+    subject = f"Alinhamento sobre {'pendência' if is_overdue else 'vencimento'} {document}"
+    if is_overdue:
+        draft = (
+            f"Olá, {client}. Tudo bem?\n\n"
+            f"Identificamos em nossa conferência financeira que o compromisso referente ao {document}, "
+            f"no valor de {value}, com vencimento em {due_date}, ainda consta como pendente em nossa base.\n\n"
+            "Você poderia, por gentileza, nos confirmar se houve algum problema no processamento, "
+            "se o pagamento já foi realizado por outro meio, ou se existe alguma previsão para regularização?\n\n"
+            "Nosso objetivo é apenas alinhar a informação e manter o controle financeiro atualizado.\n\n"
+            "Fico à disposição.\n"
+            "Obrigado."
+        )
+    else:
+        draft = (
+            f"Olá, {client}. Tudo bem?\n\n"
+            f"Estamos fazendo uma conferência preventiva dos próximos vencimentos e identificamos o compromisso "
+            f"referente ao {document}, no valor de {value}, com vencimento previsto para {due_date}.\n\n"
+            "Você poderia, por gentileza, confirmar se o pagamento está programado normalmente ou se há algum ponto "
+            "que precise ser alinhado antes do vencimento?\n\n"
+            "A ideia é evitar ruído operacional e manter a conciliação financeira atualizada.\n\n"
+            "Fico à disposição.\n"
+            "Obrigado."
+        )
     st.text_area("Mensagem sugerida", value=draft, height=260, key="agenda_draft_text")
     mailto = f"mailto:?subject={quote(subject)}&body={quote(draft)}"
     st.link_button("Abrir rascunho no e-mail", mailto, use_container_width=True)
+    if st.button("Marcar como tratado nesta sessão", use_container_width=True):
+        treated_keys.add(str(selected["_contact_key"]))
+        st.session_state["agenda_treated_contacts"] = sorted(treated_keys)
+        st.rerun()
 
 
 def demo_data(module):
