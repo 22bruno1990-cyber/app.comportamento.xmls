@@ -96,6 +96,65 @@ def css():
             color: #334962 !important;
             font-weight: 800;
         }
+        .stApp input,
+        .stApp textarea,
+        .stApp select,
+        .stApp [data-baseweb="input"],
+        .stApp [data-baseweb="textarea"],
+        .stApp [data-baseweb="select"],
+        .stApp [data-baseweb="base-input"],
+        .stApp [data-baseweb="select"] > div,
+        .stApp div[data-testid="stFileUploader"] section,
+        .stApp div[data-testid="stFileUploader"] section div,
+        .stApp div[data-testid="stTextArea"] textarea {
+            background: #ffffff !important;
+            color: #102844 !important;
+            border-color: rgba(16, 40, 68, 0.18) !important;
+        }
+        .stApp input::placeholder,
+        .stApp textarea::placeholder {
+            color: #64758c !important;
+            opacity: 1 !important;
+        }
+        .stApp div[data-testid="stFileUploader"] small,
+        .stApp div[data-testid="stFileUploader"] span,
+        .stApp div[data-testid="stFileUploader"] p {
+            color: #334962 !important;
+        }
+        .stApp .stButton button,
+        .stApp .stDownloadButton button,
+        .stApp div[data-testid="stLinkButton"] a,
+        .stApp a[data-testid="stLinkButton"] {
+            background: #ffffff !important;
+            color: #102844 !important;
+            border: 1px solid rgba(16, 40, 68, 0.18) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 10px 24px rgba(7, 17, 31, 0.06) !important;
+            font-weight: 900 !important;
+        }
+        .stApp .stButton button *,
+        .stApp .stDownloadButton button *,
+        .stApp div[data-testid="stLinkButton"] a *,
+        .stApp a[data-testid="stLinkButton"] * {
+            color: #102844 !important;
+        }
+        .stApp .stButton button:hover,
+        .stApp .stDownloadButton button:hover,
+        .stApp div[data-testid="stLinkButton"] a:hover,
+        .stApp a[data-testid="stLinkButton"]:hover {
+            background: #e9f2fb !important;
+            border-color: rgba(47, 115, 198, 0.38) !important;
+        }
+        .stApp .stButton button[kind="primary"],
+        .stApp button[data-testid="baseButton-primary"] {
+            background: #2f73c6 !important;
+            color: #ffffff !important;
+            border-color: #2f73c6 !important;
+        }
+        .stApp .stButton button[kind="primary"] *,
+        .stApp button[data-testid="baseButton-primary"] * {
+            color: #ffffff !important;
+        }
         section[data-testid="stSidebar"],
         section[data-testid="stSidebar"] > div {
             background: #07111f !important;
