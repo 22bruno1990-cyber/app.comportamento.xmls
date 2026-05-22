@@ -2,6 +2,7 @@ import io
 import calendar
 import re
 from datetime import datetime
+from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
@@ -420,9 +421,21 @@ def css():
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .event.receive { background: #e9f8f1; border-left: 4px solid #4fa37b; }
-        .event.pay { background: #fff4e2; border-left: 4px solid #d89b37; }
-        .event.overdue { background: #ffecec; border-left-color: #d9534f; }
+        .event.receive {
+            background: #e8f8ef;
+            border-left: 4px solid #2f9d62;
+            border-color: rgba(47, 157, 98, 0.20);
+        }
+        .event.pay {
+            background: #ffecec;
+            border-left: 4px solid #d9534f;
+            border-color: rgba(217, 83, 79, 0.22);
+        }
+        .event.receive.overdue {
+            background: #ddf5e8;
+            box-shadow: inset 0 0 0 1px rgba(217, 83, 79, .28);
+        }
+        .event.pay.overdue { background: #ffdede; }
         .event.today { box-shadow: inset 0 0 0 2px rgba(47, 115, 198, .32); }
         .event small {
             display: block;
@@ -432,6 +445,16 @@ def css():
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .draft-box {
+            background: #ffffff;
+            border: 1px solid rgba(16, 40, 68, 0.14);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 12px 34px rgba(7, 17, 31, 0.06);
+            margin-top: 16px;
+        }
+        .draft-box strong { color: #102844; font-size: 1.08rem; }
+        .draft-box span { color: #64758c; display: block; margin-top: 4px; }
         @media (max-width: 900px) {
             .insight-grid { grid-template-columns: 1fr; }
             .home-hero { grid-template-columns: 1fr; padding: 26px; }
@@ -780,13 +803,22 @@ def summarize_agenda(df, cols):
     result = df.copy()
     date_col = cols["data"]
     value_col = cols["valor"]
+    type_col = cols["tipo"]
+    name_col = cols["fornecedor"]
+    doc_col = cols["documento"]
     dates = to_date(result[date_col]) if date_col else pd.Series([pd.NaT] * len(result))
     values = to_number(result[value_col]) if value_col else pd.Series([0] * len(result))
+    types = result[type_col].astype(str) if type_col else pd.Series(["Evento"] * len(result))
+    names = result[name_col].astype(str) if name_col else pd.Series(["Sem nome"] * len(result))
+    docs = result[doc_col].astype(str) if doc_col else pd.Series([""] * len(result))
     today = pd.Timestamp(datetime.today().date())
     days = (dates - today).dt.days
 
     result["_data_detectada"] = dates
     result["_valor_detectado"] = values
+    result["_tipo_agenda"] = types
+    result["_nome_agenda"] = names
+    result["_documento_agenda"] = docs
     result["_dias_para_vencer"] = days
     result["_faixa"] = "Sem data"
     result.loc[days < 0, "_faixa"] = "Vencido"
@@ -803,9 +835,9 @@ def summarize_agenda(df, cols):
 
     agenda = result[result["_prioridade"].isin(["Alta", "Média"])].sort_values("_dias_para_vencer")
     by_day = (
-        pd.DataFrame({"Data": dates, "Valor": values, "Faixa": result["_faixa"]})
+        pd.DataFrame({"Data": dates, "Valor": values, "Faixa": result["_faixa"], "Tipo": result["_tipo_agenda"]})
         .dropna(subset=["Data"])
-        .groupby(["Data", "Faixa"], dropna=False)["Valor"]
+        .groupby(["Data", "Faixa", "Tipo"], dropna=False)["Valor"]
         .sum()
         .reset_index()
         .sort_values("Data")
@@ -948,10 +980,6 @@ def render_agenda_calendar(treated):
     month_name = ref_date.strftime("%B/%Y").capitalize()
     weeks = calendar.Calendar(firstweekday=0).monthdayscalendar(year, month)
 
-    inferred = infer_columns(dated)
-    type_col = "Tipo" if "Tipo" in dated.columns else None
-    name_col = "Nome" if "Nome" in dated.columns else inferred.get("fornecedor")
-    doc_col = inferred.get("documento")
     today = pd.Timestamp(datetime.today().date())
 
     html = [
@@ -975,14 +1003,14 @@ def render_agenda_calendar(treated):
             html.append('<div class="day-cell">')
             html.append(f'<div class="day-number">{day}</div>')
             for _, event in events.head(4).iterrows():
-                event_type = str(event.get(type_col, "Evento")) if type_col else "Evento"
+                event_type = str(event.get("_tipo_agenda", "Evento"))
                 event_class = "receive" if "receber" in event_type.lower() else "pay" if "pagar" in event_type.lower() else "receive"
                 if event.get("_faixa") == "Vencido":
                     event_class += " overdue"
                 if day_date.date() == today.date():
                     event_class += " today"
-                title = str(event.get(name_col, event_type))[:34] if name_col else event_type
-                doc = str(event.get(doc_col, ""))[:22] if doc_col else ""
+                title = str(event.get("_nome_agenda", event_type))[:34]
+                doc = str(event.get("_documento_agenda", ""))[:22]
                 value = currency(event.get("_valor_detectado", 0))
                 faixa = str(event.get("_faixa", ""))
                 html.append(f'<div class="event {event_class}">')
@@ -997,6 +1025,57 @@ def render_agenda_calendar(treated):
             html.append("</div>")
     html.append("</div></div>")
     st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def render_collection_draft(agenda):
+    if agenda.empty or "_tipo_agenda" not in agenda.columns:
+        return
+
+    receivables = agenda[
+        agenda["_tipo_agenda"].astype(str).str.lower().str.contains("receber", na=False)
+        & agenda["_faixa"].isin(["Vencido", "Vence hoje", "Próximos 7 dias"])
+    ].copy()
+    if receivables.empty:
+        return
+
+    receivables = receivables.sort_values(["_dias_para_vencer", "_valor_detectado"], ascending=[True, False])
+    labels = []
+    for idx, row in receivables.iterrows():
+        date_txt = row["_data_detectada"].strftime("%d/%m/%Y") if pd.notna(row["_data_detectada"]) else "sem data"
+        labels.append(
+            f"{row.get('_nome_agenda', 'Cliente')} · {row.get('_documento_agenda', 'Documento')} · "
+            f"{currency(row.get('_valor_detectado', 0))} · {date_txt} · {row.get('_faixa', '')}"
+        )
+
+    st.markdown(
+        """
+        <div class="draft-box">
+          <strong>Rascunho de cobrança respeitosa</strong>
+          <span>Selecione um recebimento pendente para gerar uma mensagem pronta para e-mail.</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    selected_label = st.selectbox("Pendência para contato", labels, key="agenda_draft_item")
+    selected = receivables.iloc[labels.index(selected_label)]
+    client = str(selected.get("_nome_agenda", "cliente")).strip() or "cliente"
+    document = str(selected.get("_documento_agenda", "documento")).strip() or "documento"
+    value = currency(selected.get("_valor_detectado", 0))
+    due_date = selected["_data_detectada"].strftime("%d/%m/%Y") if pd.notna(selected["_data_detectada"]) else "data não identificada"
+    subject = f"Alinhamento sobre pendência {document}"
+    draft = (
+        f"Olá, {client}. Tudo bem?\n\n"
+        f"Identificamos em nossa conferência financeira que o compromisso referente ao {document}, "
+        f"no valor de {value}, com vencimento em {due_date}, ainda consta como pendente em nossa base.\n\n"
+        "Você poderia, por gentileza, nos confirmar se houve algum problema no processamento, "
+        "se o pagamento já foi realizado por outro meio, ou se existe alguma previsão para regularização?\n\n"
+        "Nosso objetivo é apenas alinhar a informação e manter o controle financeiro atualizado.\n\n"
+        "Fico à disposição.\n"
+        "Obrigado."
+    )
+    st.text_area("Mensagem sugerida", value=draft, height=260, key="agenda_draft_text")
+    mailto = f"mailto:?subject={quote(subject)}&body={quote(draft)}"
+    st.link_button("Abrir rascunho no e-mail", mailto, use_container_width=True)
 
 
 def demo_data(module):
@@ -1102,12 +1181,29 @@ def demo_data(module):
         base = pd.DataFrame(
             [
                 ["Receber", "Cliente Atlas", "NF-R1020", "02/05/2026", "1.800,00"],
-                ["Receber", "Cliente Beta", "NF-R1021", "08/05/2026", "2.450,00"],
-                ["Receber", "Cliente Cromo", "NF-R1022", "14/05/2026", "3.900,00"],
                 ["Pagar", "Fornecedor Alpha", "NF-9001", "03/05/2026", "1.250,00"],
-                ["Pagar", "Beta Peças", "NF-9002", "13/05/2026", "3.480,00"],
-                ["Pagar", "Delta Materiais", "NF-9004", "16/05/2026", "890,00"],
-                ["Pagar", "Omega Facilities", "NF-9005", "21/05/2026", "2.440,00"],
+                ["Receber", "Cliente Beta", "NF-R1021", "05/05/2026", "2.450,00"],
+                ["Pagar", "Norte Energia", "CONTA-0426", "06/05/2026", "740,00"],
+                ["Receber", "Cliente Cromo", "NF-R1022", "08/05/2026", "3.900,00"],
+                ["Pagar", "Beta Peças", "NF-9002", "09/05/2026", "3.480,00"],
+                ["Receber", "Cliente Delta", "NF-R1023", "10/05/2026", "1.250,00"],
+                ["Pagar", "Delta Materiais", "NF-9004", "13/05/2026", "890,00"],
+                ["Receber", "Cliente Essencial", "NF-R1024", "14/05/2026", "7.800,00"],
+                ["Pagar", "Omega Facilities", "NF-9005", "15/05/2026", "2.440,00"],
+                ["Receber", "Cliente Forte", "NF-R1025", "18/05/2026", "6.400,00"],
+                ["Pagar", "Sigma Segurança", "NF-9010", "18/05/2026", "1.980,00"],
+                ["Receber", "Cliente Giga", "NF-R1026", "20/05/2026", "4.200,00"],
+                ["Pagar", "Lumen Internet", "FAT-0526", "21/05/2026", "520,00"],
+                ["Receber", "Cliente Horizonte", "NF-R1027", "22/05/2026", "2.760,00"],
+                ["Pagar", "Folha adiantamento", "FOLHA-0526", "22/05/2026", "5.900,00"],
+                ["Receber", "Cliente Ímpar", "NF-R1028", "25/05/2026", "3.150,00"],
+                ["Pagar", "Aluguel Operacional", "ALUG-0526", "25/05/2026", "4.800,00"],
+                ["Receber", "Cliente Júpiter", "NF-R1029", "27/05/2026", "8.100,00"],
+                ["Pagar", "Fornecedor Kappa", "NF-9011", "27/05/2026", "2.300,00"],
+                ["Receber", "Cliente Lince", "NF-R1030", "29/05/2026", "1.680,00"],
+                ["Pagar", "Impostos e guias", "GUIA-0526", "29/05/2026", "3.740,00"],
+                ["Receber", "Cliente Matrix", "NF-R1031", "31/05/2026", "5.600,00"],
+                ["Pagar", "Cartão corporativo", "CART-0526", "31/05/2026", "1.120,00"],
             ],
             columns=["Tipo", "Nome", "Documento", "Vencimento", "Valor"],
         )
@@ -1307,6 +1403,7 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
             render_agenda_calendar(treated)
             st.markdown("### Agenda de ações")
             st.dataframe(agenda.head(50), use_container_width=True)
+            render_collection_draft(agenda)
             sheets = {"Base tratada": treated, "Agenda de ações": agenda, "Visão por data": by_day}
         else:
             accountant = accountant or {}
