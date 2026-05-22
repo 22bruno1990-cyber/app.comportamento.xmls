@@ -1462,7 +1462,11 @@ def main():
             """,
             unsafe_allow_html=True,
         )
-        run = st.button("Gerar diagnóstico", type="primary", use_container_width=True) or using_demo
+        run_clicked = st.button("Gerar diagnóstico", type="primary", use_container_width=True)
+        if run_clicked and primary is None and not using_demo:
+            load_demo(module)
+            st.rerun()
+        run = run_clicked or using_demo
 
     with right:
         st.subheader("Resultado")
