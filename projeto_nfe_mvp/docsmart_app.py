@@ -278,16 +278,28 @@ def css():
             min-height: 42px;
             border-radius: 9px;
             padding: 8px 14px;
-            color: #102844;
+            color: #102844 !important;
             font-weight: 900;
             background: transparent;
             border: 1px solid transparent;
+            white-space: nowrap;
+            overflow: visible;
+        }
+        div[data-testid="stTabs"] button[role="tab"] * {
+            color: #102844 !important;
+            font-weight: 900 !important;
         }
         div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
             background: #102844;
-            color: #f8fbff;
+            color: #f8fbff !important;
             border-color: #102844;
             box-shadow: 0 8px 22px rgba(16, 40, 68, 0.22);
+        }
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] *,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] span,
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] div {
+            color: #f8fbff !important;
         }
         div[data-testid="stTabs"] button[role="tab"][aria-selected="false"]:hover {
             background: rgba(47, 115, 198, 0.10);
