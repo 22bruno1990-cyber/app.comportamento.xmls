@@ -2,6 +2,7 @@ import io
 import calendar
 import re
 from datetime import datetime
+from html import escape
 from urllib.parse import quote
 
 import pandas as pd
@@ -318,6 +319,59 @@ def css():
         .insight-card.danger { border-top-color: #d9534f; }
         .insight-card strong { display:block; color:#102844; margin-bottom: 8px; }
         .insight-card span { color:#64758c; font-size:.92rem; line-height:1.35; }
+        .value-pack {
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.96), rgba(239,246,255,.96)),
+                radial-gradient(circle at 90% 10%, rgba(92, 200, 255, .14), transparent 30%);
+            border: 1px solid rgba(16, 40, 68, 0.12);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 16px 44px rgba(7, 17, 31, 0.08);
+            margin: 16px 0 20px;
+        }
+        .value-pack > strong {
+            display: block;
+            color: #102844;
+            font-size: 1.18rem;
+            margin-bottom: 12px;
+        }
+        .value-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .value-card {
+            background: #ffffff;
+            border: 1px solid rgba(16, 40, 68, .10);
+            border-left: 5px solid #2f73c6;
+            border-radius: 12px;
+            padding: 14px;
+            min-height: 134px;
+        }
+        .value-card.warning { border-left-color: #d89b37; }
+        .value-card.danger { border-left-color: #d9534f; }
+        .value-card.success { border-left-color: #4fa37b; }
+        .value-card span {
+            color: #64758c !important;
+            display:block;
+            font-size:.78rem;
+            font-weight:900;
+            text-transform:uppercase;
+            margin-bottom:6px;
+        }
+        .value-card strong {
+            color:#102844 !important;
+            display:block;
+            font-size:1.38rem;
+            line-height:1.05;
+            margin-bottom:8px;
+        }
+        .value-card p {
+            color:#64758c !important;
+            margin:0;
+            font-size:.88rem;
+            line-height:1.32;
+        }
         div[data-testid="stTabs"] {
             background: #ffffff;
             border: 1px solid rgba(16, 40, 68, 0.14);
@@ -631,6 +685,25 @@ def insight_grid(insights):
         html.append(f'<div class="insight-card {tone}"><strong>{title}</strong><span>{copy}</span></div>')
     html.append("</div>")
     st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def render_value_pack(title, cards, action_plan, watchlist=None):
+    html = [f'<div class="value-pack"><strong>{escape(title)}</strong><div class="value-grid">']
+    for card in cards:
+        label = escape(str(card.get("label", "")))
+        value = escape(str(card.get("value", "")))
+        copy = escape(str(card.get("copy", "")))
+        tone = escape(str(card.get("tone", "")))
+        html.append(
+            f'<div class="value-card {tone}"><span>{label}</span><strong>{value}</strong><p>{copy}</p></div>'
+        )
+    html.append("</div></div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+    st.markdown("### Plano de ação sugerido")
+    st.dataframe(action_plan, use_container_width=True, hide_index=True)
+    if watchlist is not None and not watchlist.empty:
+        st.markdown("### Watchlist para conferência")
+        st.dataframe(watchlist, use_container_width=True, hide_index=True)
 
 
 def build_excel(sheets):
@@ -1349,6 +1422,43 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
             metrics, treated, alerts, top, monthly, alert_summary, seasonality, weekly, insights = summarize_planilhas(df, cols)
             metric_grid(metrics)
             insight_grid(insights)
+            priority_value = alerts["_valor_detectado"].sum() if "_valor_detectado" in alerts.columns else 0
+            leading_name = top.iloc[0]["Nome"] if not top.empty else "Sem concentração"
+            leading_value = top.iloc[0]["Valor"] if not top.empty else 0
+            peak_band = seasonality.sort_values("Valor", ascending=False).head(1)
+            peak_label = peak_band.iloc[0]["Faixa do mês"] if not peak_band.empty else "Sem leitura"
+            action_plan = pd.DataFrame(
+                [
+                    ["1", "Conferir documentos repetidos e scores altos", f"{len(alerts)} linha(s) priorizada(s)", "Operador financeiro", "Hoje"],
+                    ["2", "Validar concentração por fornecedor/cliente", f"{leading_name} concentra {currency(leading_value)}", "Gestor da área", "24h"],
+                    ["3", "Revisar sazonalidade da base", f"Pico detectado em {peak_label}", "Financeiro", "Próximo fechamento"],
+                    ["4", "Definir regra mensal de acompanhamento", "Transformar alertas recorrentes em rotina de controle", "Decisor", "Após validação"],
+                ],
+                columns=["Etapa", "Ação", "Evidência", "Responsável sugerido", "Prazo sugerido"],
+            )
+            watch_cols = [
+                col for col in [
+                    cols.get("documento"),
+                    cols.get("fornecedor"),
+                    cols.get("data"),
+                    cols.get("valor"),
+                    "_score_atencao",
+                    "_alerta",
+                    "_motivos",
+                ] if col and col in alerts.columns
+            ]
+            watchlist = alerts[watch_cols].head(12).copy() if watch_cols else pd.DataFrame()
+            render_value_pack(
+                "Pacote de decisão gerado pela leitura de Planilhas",
+                [
+                    {"label": "Volume avaliado", "value": f"{len(treated):,}".replace(",", "."), "copy": "Linhas normalizadas para leitura executiva.", "tone": "success"},
+                    {"label": "Valor em atenção", "value": currency(priority_value), "copy": "Soma dos itens com prioridade média ou alta.", "tone": "danger" if priority_value else ""},
+                    {"label": "Maior concentração", "value": str(leading_name), "copy": f"{currency(leading_value)} concentrados no principal nome.", "tone": "warning"},
+                    {"label": "Entrega prática", "value": "Excel + plano", "copy": "Base tratada, alertas, ranking, tendência e ações.", "tone": ""},
+                ],
+                action_plan,
+                watchlist,
+            )
             tab_alerts, tab_rank, tab_trend, tab_season = st.tabs(["Alertas priorizados", "Ranking", "Tendência", "Sazonalidade"])
             with tab_alerts:
                 st.markdown("### Alertas priorizados por score")
@@ -1393,6 +1503,8 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
                 "Sazonalidade": seasonality,
                 "Semanas do mês": weekly,
                 "Resumo alertas": alert_summary,
+                "Plano de ação": action_plan,
+                "Watchlist": watchlist,
             }
 
         elif module in ["Pagamentos", "Cobrança"]:
@@ -1405,6 +1517,44 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
             metrics, treated, pending, top, status_summary, monthly, weekly, insights = match_by_doc_or_value(df, sec_df, cols, sec_cols, paid_label)
             metric_grid(metrics)
             insight_grid(insights)
+            pending_value = pending["_valor_detectado"].sum() if "_valor_detectado" in pending.columns else 0
+            leading_name = top.iloc[0]["Nome"] if not top.empty else "Sem concentração"
+            leading_value = top.iloc[0]["Valor"] if not top.empty else 0
+            found_count = treated["_status_docsmart"].astype(str).str.contains(paid_label, regex=False).sum() if "_status_docsmart" in treated.columns else 0
+            risk_word = "pagamento" if module == "Pagamentos" else "recebimento"
+            action_plan = pd.DataFrame(
+                [
+                    ["1", f"Atacar pendências de {risk_word}", f"{len(pending)} item(ns), {currency(pending_value)}", "Operador financeiro", "Hoje"],
+                    ["2", "Resolver divergências de valor", "Separar itens com status divergente antes de qualquer baixa manual", "Analista responsável", "24h"],
+                    ["3", "Confirmar concentração por contraparte", f"{leading_name} soma {currency(leading_value)}", "Gestor financeiro", "Próximo fechamento"],
+                    ["4", "Formalizar rotina mensal", "Usar o cruzamento como checklist recorrente de conferência", "Decisor", "Após diagnóstico"],
+                ],
+                columns=["Etapa", "Ação", "Evidência", "Responsável sugerido", "Prazo sugerido"],
+            )
+            watch_cols = [
+                col for col in [
+                    cols.get("documento"),
+                    cols.get("fornecedor"),
+                    cols.get("data"),
+                    cols.get("valor"),
+                    "_status_docsmart",
+                    "_score_atencao",
+                    "_prioridade",
+                    "_motivo",
+                ] if col and col in pending.columns
+            ]
+            watchlist = pending[watch_cols].head(12).copy() if watch_cols else pd.DataFrame()
+            render_value_pack(
+                f"Pacote de decisão gerado pelo cruzamento de {module}",
+                [
+                    {"label": "Base cruzada", "value": f"{len(treated):,}".replace(",", "."), "copy": "Linhas comparadas entre base principal e base de baixa.", "tone": "success"},
+                    {"label": "Localizados", "value": str(found_count), "copy": f"Itens com {risk_word} reconhecido por documento ou valor.", "tone": "success"},
+                    {"label": "Valor pendente", "value": currency(pending_value), "copy": "Montante que exige ação, confirmação ou correção.", "tone": "danger" if pending_value else ""},
+                    {"label": "Entrega prática", "value": "Cruzamento + ações", "copy": "Pendências, status, concentração, sazonalidade e plano.", "tone": ""},
+                ],
+                action_plan,
+                watchlist,
+            )
             st.caption(
                 "Colunas da segunda base: "
                 + ", ".join(f"{k}: {v or 'não encontrada'}" for k, v in sec_cols.items())
@@ -1453,6 +1603,8 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
                 "Evolução mensal": monthly,
                 "Semanas": weekly,
                 "Base secundária": sec_df,
+                "Plano de ação": action_plan,
+                "Watchlist": watchlist,
             }
 
         elif module == "Agenda":
