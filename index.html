@@ -281,6 +281,37 @@
       font-size: 2rem;
       line-height: 1;
     }
+    .simulation-cards .card {
+      min-height: 348px;
+      padding: 22px;
+      display: grid;
+      grid-template-rows: auto minmax(112px, auto) 72px minmax(82px, auto);
+      gap: 14px;
+    }
+    .simulation-cards .card h3 {
+      min-height: 32px;
+      display: flex;
+      align-items: flex-start;
+    }
+    .simulation-cards .card > p:first-of-type,
+    .simulation-cards .card > p:last-of-type {
+      min-height: 0;
+      margin: 0;
+      line-height: 1.38;
+    }
+    .simulation-cards .price {
+      margin: 0;
+      align-self: end;
+      min-height: 72px;
+      display: flex;
+      align-items: flex-end;
+      font-size: clamp(1.85rem, 2.4vw, 2.45rem);
+      line-height: 0.98;
+      overflow-wrap: anywhere;
+    }
+    .simulation-cards .card > p:last-of-type {
+      align-self: start;
+    }
     .pricing-panel {
       overflow: hidden;
       background: #fff;
@@ -652,36 +683,36 @@
           <h2>Simule antes de enviar a base real.</h2>
           <p>Use esta página para entender o que cada leitura entrega. O app fica reservado para upload operacional de CSV/XLSX.</p>
         </div>
-        <div class="cards module-cards">
+        <div class="cards module-cards simulation-cards">
           <article class="card">
             <h3>Painel</h3>
-            <p>Mostra volume analisado, valor em atenção, concentração por fornecedor/cliente, alertas e plano de ação.</p>
+            <p>Organiza a base em indicadores, alertas, concentração por fornecedor ou cliente e plano de ação.</p>
             <div class="price">Visão executiva</div>
-            <p>Ideal quando a empresa só sabe que a planilha está bagunçada.</p>
+            <p>Bom quando a empresa sabe que há desordem, mas ainda não sabe onde atacar.</p>
           </article>
           <article class="card">
             <h3>Pagamentos</h3>
-            <p>Cruza contas a pagar com base de baixas para apontar pago, pendente e divergente.</p>
+            <p>Cruza contas a pagar com baixas exportadas para apontar itens pagos, pendentes e divergentes.</p>
             <div class="price">Cruzamento</div>
-            <p>Ajuda a evitar pagamento duplicado, atraso e baixa incorreta.</p>
+            <p>Ajuda a reduzir pagamento duplicado, atraso operacional e baixa incorreta.</p>
           </article>
           <article class="card">
             <h3>Cobrança</h3>
-            <p>Mostra recebimentos localizados, pendências e fila de contato por cliente.</p>
+            <p>Compara contas a receber com recebimentos e cria uma fila de contato por cliente.</p>
             <div class="price">Recebíveis</div>
-            <p>Inclui rascunho respeitoso para contato de cobrança ou prevenção.</p>
+            <p>Inclui rascunho respeitoso para cobrança em atraso ou prevenção de vencimento.</p>
           </article>
           <article class="card">
             <h3>Agenda</h3>
-            <p>Organiza pagar e receber no mês, com cores por tipo e priorização de vencimentos.</p>
+            <p>Distribui pagar e receber no calendário, com cores por tipo e prioridade por vencimento.</p>
             <div class="price">Calendário</div>
-            <p>Ajuda a enxergar concentração de caixa e próximos compromissos.</p>
+            <p>Ajuda a enxergar concentração de caixa, atrasos e compromissos próximos.</p>
           </article>
           <article class="card">
             <h3>Fiscal Assist</h3>
-            <p>Organiza entradas, saídas, categorias sugeridas e pontos de validação para contador.</p>
+            <p>Organiza entradas, saídas, categorias sugeridas e pontos de validação para envio contábil.</p>
             <div class="price">Pacote técnico</div>
-            <p>Não calcula imposto; estrutura a base para validação profissional.</p>
+            <p>Não calcula imposto. Estrutura a base para validação profissional do contador.</p>
           </article>
         </div>
       </div>
