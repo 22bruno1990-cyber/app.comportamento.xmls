@@ -335,6 +335,184 @@
     .simulation-cards .card > p:last-of-type {
       align-self: start;
     }
+    .demo-actions {
+      margin: 18px 0 16px;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .demo-button {
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--navy);
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 26px rgba(7, 17, 31, 0.06);
+    }
+    .demo-button.active,
+    .demo-button:hover {
+      background: var(--navy);
+      color: #fff;
+      border-color: var(--navy);
+    }
+    .demo-result {
+      margin-top: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 18px 56px rgba(7, 17, 31, 0.1);
+      overflow: hidden;
+    }
+    .demo-result-head {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
+      align-items: end;
+      background: linear-gradient(135deg, #102844, #19385d);
+      color: #f8fbff;
+    }
+    .demo-result-head h3 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 3rem);
+      line-height: 1;
+    }
+    .demo-result-head p {
+      margin: 12px 0 0;
+      color: rgba(248, 251, 255, 0.78);
+    }
+    .demo-summary {
+      padding: 16px;
+      border: 1px solid rgba(248, 251, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(248, 251, 255, 0.08);
+      color: rgba(248, 251, 255, 0.86);
+      font-weight: 750;
+    }
+    .demo-metrics {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      background: #f8fbff;
+      border-bottom: 1px solid var(--line);
+    }
+    .demo-metric {
+      min-height: 118px;
+      padding: 16px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .demo-metric span {
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.86rem;
+    }
+    .demo-metric strong {
+      color: var(--blue);
+      font-size: 2rem;
+      line-height: 1;
+    }
+    .demo-workspace {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
+      gap: 16px;
+    }
+    .demo-block {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .demo-block h4 {
+      margin: 0;
+      padding: 14px 16px;
+      color: var(--navy);
+      background: #eef5fc;
+      border-bottom: 1px solid var(--line);
+    }
+    .demo-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .demo-table th,
+    .demo-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      color: var(--navy);
+      vertical-align: top;
+    }
+    .demo-table th {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .demo-table tr:last-child td {
+      border-bottom: 0;
+    }
+    .demo-tag {
+      display: inline-flex;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #fff4df;
+      color: #8c5a04;
+      font-weight: 900;
+      font-size: 0.78rem;
+    }
+    .demo-tag.good {
+      background: #e7f7ef;
+      color: #236344;
+    }
+    .demo-tag.bad {
+      background: #ffe8e8;
+      color: #963535;
+    }
+    .demo-list {
+      margin: 0;
+      padding: 14px 18px 16px 34px;
+      color: var(--muted);
+    }
+    .demo-list li {
+      margin: 8px 0;
+    }
+    .demo-calendar {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+      background: #f8fbff;
+    }
+    .demo-day {
+      min-height: 86px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--navy);
+      font-weight: 900;
+    }
+    .demo-event {
+      display: block;
+      margin-top: 6px;
+      padding: 5px 6px;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.72rem;
+      line-height: 1.15;
+      font-weight: 850;
+    }
+    .demo-event.receive { background: var(--green); }
+    .demo-event.pay { background: #c95454; }
     .pricing-panel {
       overflow: hidden;
       background: #fff;
@@ -533,6 +711,10 @@
       .module-cards,
       .selector-grid,
       .module-selector-grid,
+      .demo-actions,
+      .demo-result-head,
+      .demo-metrics,
+      .demo-workspace,
       .steps,
       .policy-grid,
       .compare,
@@ -738,6 +920,15 @@
             <p>Não calcula imposto. Estrutura a base para validação profissional do contador.</p>
           </article>
         </div>
+        <div class="demo-actions" aria-label="Escolha uma simulação de diagnóstico">
+          <button class="demo-button active" type="button" data-demo="completo">Completo</button>
+          <button class="demo-button" type="button" data-demo="painel">Painel</button>
+          <button class="demo-button" type="button" data-demo="pagamentos">Pagamentos</button>
+          <button class="demo-button" type="button" data-demo="cobranca">Cobrança</button>
+          <button class="demo-button" type="button" data-demo="agenda">Agenda</button>
+          <button class="demo-button" type="button" data-demo="fiscal">Fiscal Assist</button>
+        </div>
+        <div class="demo-result" id="demo-result" aria-live="polite"></div>
       </div>
     </section>
 
@@ -934,5 +1125,228 @@
       <span>Organiza sinais de atenção; não substitui ERP, auditoria ou validação jurídica/fiscal.</span>
     </div>
   </footer>
+  <script>
+    const demoData = {
+      completo: {
+        title: "Diagnóstico completo em uma leitura",
+        copy: "Simula a empresa enviando uma base bagunçada e recebendo visão executiva, pagamentos, cobrança, agenda e pacote técnico para contador.",
+        summary: "Resumo para decisão: 42 linhas analisadas, R$ 128.450 em movimento, 11 alertas operacionais e 5 ações recomendadas para os próximos 7 dias.",
+        metrics: [
+          ["Volume lido", "42 linhas", "base consolidada"],
+          ["Valor em atenção", "R$ 38,9k", "pendente, duplicado ou divergente"],
+          ["Prioridade", "11 alertas", "alto impacto operacional"],
+          ["Entrega", "5 módulos", "painel, agenda, cruzamentos e fiscal"]
+        ],
+        rows: [
+          ["Delta Logística", "R$ 12.600", "Fora do padrão", "bad"],
+          ["Norte Logística", "R$ 6.100", "Duplicidade provável", "bad"],
+          ["Cliente Essencial", "R$ 8.100", "Recebível próximo", "warn"],
+          ["Beta Peças", "R$ 650", "Diferença no pagamento", "warn"]
+        ],
+        actions: [
+          "Conferir duplicidade da NF-9013 antes de nova baixa.",
+          "Validar cobrança preventiva de Cliente Essencial e Cliente Júpiter.",
+          "Separar Delta Logística para revisão de contrato ou frete extraordinário.",
+          "Encaminhar pacote fiscal ao contador com pontos sem categoria e CNPJ faltante."
+        ],
+        calendar: true
+      },
+      painel: {
+        title: "Painel de planilhas",
+        copy: "Transforma uma planilha financeira em leitura executiva com concentração, sazonalidade, duplicidade e fornecedor fora do padrão.",
+        summary: "Resumo para decisão: 21 documentos, R$ 70.330 analisados, concentração em logística e um pico relevante na semana 4 de abril.",
+        metrics: [
+          ["Documentos", "21", "linhas tratadas"],
+          ["Duplicidades", "1", "NF repetida"],
+          ["Maior pico", "R$ 12,6k", "semana 4 de abril"],
+          ["Concentração", "41%", "top 2 fornecedores"]
+        ],
+        rows: [
+          ["Delta Logística", "R$ 12.600", "Pico sazonal", "warn"],
+          ["Beta Serviços", "R$ 4.100", "Documento duplicado", "bad"],
+          ["Fornecedor Atlas", "R$ 1.460", "Alta vs média", "warn"],
+          ["Norte Tecnologia", "R$ 980", "Recorrente esperado", "good"]
+        ],
+        actions: [
+          "Revisar frete extra antes de aprovar pagamento.",
+          "Criar rotina de conferência para NF duplicada.",
+          "Monitorar fornecedores com aumento acima da média do período."
+        ]
+      },
+      pagamentos: {
+        title: "Cruzamento de pagamentos",
+        copy: "Compara contas a pagar com baixa, extrato ou relatório financeiro para apontar pago, pendente, divergente e duplicado.",
+        summary: "Resumo para decisão: R$ 40.230 em contas, R$ 26.760 localizados em baixas e 4 itens exigindo conferência antes de pagamento.",
+        metrics: [
+          ["Contas", "15", "a pagar"],
+          ["Pagas", "9", "localizadas na baixa"],
+          ["Pendentes", "4", "sem baixa encontrada"],
+          ["Divergências", "2", "valor ou documento diferente"]
+        ],
+        rows: [
+          ["NF-9013 Norte Logística", "R$ 6.100", "Duplicidade provável", "bad"],
+          ["NF-9007 Beta Peças", "R$ 220", "Diferença de baixa", "warn"],
+          ["NF-9005 Omega", "R$ 2.440", "Sem pagamento localizado", "bad"],
+          ["NF-9001 Alpha", "R$ 1.250", "Pago", "good"]
+        ],
+        actions: [
+          "Bloquear pagamento de itens duplicados até validação.",
+          "Conferir baixa parcial ou desconto em Beta Peças.",
+          "Priorizar pendências por vencimento e valor."
+        ]
+      },
+      cobranca: {
+        title: "Cobrança e recebíveis",
+        copy: "Cruza contas a receber com recebimentos para montar fila de contato, cobrança respeitosa e prevenção de atraso.",
+        summary: "Resumo para decisão: R$ 34.720 em recebíveis, R$ 17.240 já recebidos e R$ 17.480 em atraso ou próximo do vencimento.",
+        metrics: [
+          ["Recebíveis", "15", "documentos"],
+          ["Recebidos", "8", "localizados"],
+          ["Em atraso", "4", "contato prioritário"],
+          ["Próximos", "3", "prevenção de vencimento"]
+        ],
+        rows: [
+          ["Cliente Essencial", "R$ 8.100", "Próximo vencimento", "warn"],
+          ["Cliente Forte", "R$ 6.400", "Sem recebimento", "bad"],
+          ["Cliente Beta", "R$ 720", "Pagamento parcial", "warn"],
+          ["Cliente Atlas", "R$ 2.100", "Recebido", "good"]
+        ],
+        actions: [
+          "Gerar rascunho de e-mail para clientes em atraso.",
+          "Separar cobrança preventiva para vencimentos próximos.",
+          "Atualizar status após retorno do cliente para retirar da fila."
+        ]
+      },
+      agenda: {
+        title: "Agenda financeira do mês",
+        copy: "Distribui pagamentos e recebimentos em calendário, separando entradas e saídas por cor para enxergar concentração de caixa.",
+        summary: "Resumo para decisão: maio concentra R$ 49.790 a receber e R$ 29.180 a pagar, com maior pressão nos dias 22, 25, 27 e 31.",
+        metrics: [
+          ["A receber", "R$ 49,8k", "13 eventos"],
+          ["A pagar", "R$ 29,2k", "11 eventos"],
+          ["Dias críticos", "4", "concentração de caixa"],
+          ["Rascunhos", "6", "cobrança ou prevenção"]
+        ],
+        rows: [
+          ["22/05", "R$ 8.660", "Receber e pagar no mesmo dia", "warn"],
+          ["25/05", "R$ 7.950", "Pressão de caixa", "warn"],
+          ["27/05", "R$ 10.400", "Alto volume", "bad"],
+          ["31/05", "R$ 6.720", "Fechamento mensal", "warn"]
+        ],
+        actions: [
+          "Antecipar contato com clientes de maior valor.",
+          "Organizar pagamentos críticos para evitar saída concentrada.",
+          "Usar rascunhos de cobrança para inadimplentes e próximos vencimentos."
+        ],
+        calendar: true
+      },
+      fiscal: {
+        title: "Fiscal Assist para envio contábil",
+        copy: "Organiza entradas, saídas, categorias sugeridas e pontos de validação para o contador, sem calcular imposto ou substituir o CRC.",
+        summary: "Resumo para decisão: 16 documentos classificados, 4 pontos de validação e pacote final condicionado ao contador informado.",
+        metrics: [
+          ["Entradas", "9", "documentos de despesa"],
+          ["Saídas", "6", "documentos de receita"],
+          ["Revisar", "4", "categoria, CNPJ ou valor"],
+          ["Entrega", "CRC", "validação contábil obrigatória"]
+        ],
+        rows: [
+          ["NF-3309", "R$ 1.110", "CNPJ ausente", "bad"],
+          ["NF-3310", "R$ 0", "Valor não informado", "bad"],
+          ["NF-8806", "R$ 6.400", "Categoria vazia", "warn"],
+          ["NF-3301", "R$ 1.250", "Classificado", "good"]
+        ],
+        actions: [
+          "Separar itens sem CNPJ ou valor antes de envio contábil.",
+          "Confirmar contador, CRC, e-mail e competência do pacote.",
+          "Registrar que o relatório é técnico e exige validação profissional."
+        ]
+      }
+    };
+
+    const calendarEvents = [
+      [2, "Receber Atlas", "receive"],
+      [3, "Pagar Alpha", "pay"],
+      [8, "Receber Cromo", "receive"],
+      [9, "Pagar Beta", "pay"],
+      [14, "Receber Essencial", "receive"],
+      [15, "Pagar Omega", "pay"],
+      [22, "Receber Horizonte", "receive"],
+      [22, "Folha", "pay"],
+      [25, "Receber Ímpar", "receive"],
+      [25, "Aluguel", "pay"],
+      [27, "Receber Júpiter", "receive"],
+      [29, "Guias", "pay"],
+      [31, "Receber Matrix", "receive"],
+      [31, "Cartão", "pay"]
+    ];
+
+    function renderCalendar() {
+      return `<div class="demo-block"><h4>Calendário de maio</h4><div class="demo-calendar">${
+        Array.from({ length: 31 }, (_, index) => {
+          const day = index + 1;
+          const events = calendarEvents
+            .filter((event) => event[0] === day)
+            .map((event) => `<span class="demo-event ${event[2]}">${event[1]}</span>`)
+            .join("");
+          return `<div class="demo-day">${day}${events}</div>`;
+        }).join("")
+      }</div></div>`;
+    }
+
+    function renderDemo(key) {
+      const demo = demoData[key];
+      const result = document.querySelector("#demo-result");
+      if (!result || !demo) return;
+      const metrics = demo.metrics.map((metric) => `
+        <div class="demo-metric">
+          <span>${metric[0]}</span>
+          <strong>${metric[1]}</strong>
+          <span>${metric[2]}</span>
+        </div>
+      `).join("");
+      const rows = demo.rows.map((row) => `
+        <tr>
+          <td>${row[0]}</td>
+          <td>${row[1]}</td>
+          <td><span class="demo-tag ${row[3] === "good" ? "good" : row[3] === "bad" ? "bad" : ""}">${row[2]}</span></td>
+        </tr>
+      `).join("");
+      const actions = demo.actions.map((action) => `<li>${action}</li>`).join("");
+      result.innerHTML = `
+        <div class="demo-result-head">
+          <div>
+            <h3>${demo.title}</h3>
+            <p>${demo.copy}</p>
+          </div>
+          <div class="demo-summary">${demo.summary}</div>
+        </div>
+        <div class="demo-metrics">${metrics}</div>
+        <div class="demo-workspace">
+          <div class="demo-block">
+            <h4>Achados principais</h4>
+            <table class="demo-table">
+              <thead><tr><th>Item</th><th>Valor</th><th>Status</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div class="demo-block">
+            <h4>Plano de ação sugerido</h4>
+            <ol class="demo-list">${actions}</ol>
+          </div>
+          ${demo.calendar ? renderCalendar() : ""}
+        </div>
+      `;
+    }
+
+    document.querySelectorAll(".demo-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".demo-button").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        renderDemo(button.dataset.demo);
+      });
+    });
+    renderDemo("completo");
+  </script>
 </body>
 </html>
