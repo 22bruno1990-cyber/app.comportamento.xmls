@@ -305,9 +305,20 @@
       min-height: 72px;
       display: flex;
       align-items: flex-end;
-      font-size: clamp(1.85rem, 2.4vw, 2.45rem);
+      font-size: 2.1rem;
       line-height: 0.98;
-      overflow-wrap: anywhere;
+      overflow-wrap: normal;
+      word-break: normal;
+      hyphens: manual;
+      max-width: 100%;
+    }
+    .simulation-cards .price .keep {
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .simulation-cards .price.compact {
+      font-size: 1.82rem;
+      letter-spacing: 0;
     }
     .simulation-cards .card > p:last-of-type {
       align-self: start;
@@ -687,31 +698,31 @@
           <article class="card">
             <h3>Painel</h3>
             <p>Organiza a base em indicadores, alertas, concentração por fornecedor ou cliente e plano de ação.</p>
-            <div class="price">Visão executiva</div>
+            <div class="price compact"><span class="keep">Visão</span> <span class="keep">executiva</span></div>
             <p>Bom quando a empresa sabe que há desordem, mas ainda não sabe onde atacar.</p>
           </article>
           <article class="card">
             <h3>Pagamentos</h3>
             <p>Cruza contas a pagar com baixas exportadas para apontar itens pagos, pendentes e divergentes.</p>
-            <div class="price">Cruzamento</div>
+            <div class="price compact"><span class="keep">Cruzamento</span></div>
             <p>Ajuda a reduzir pagamento duplicado, atraso operacional e baixa incorreta.</p>
           </article>
           <article class="card">
             <h3>Cobrança</h3>
             <p>Compara contas a receber com recebimentos e cria uma fila de contato por cliente.</p>
-            <div class="price">Recebíveis</div>
+            <div class="price"><span class="keep">Recebíveis</span></div>
             <p>Inclui rascunho respeitoso para cobrança em atraso ou prevenção de vencimento.</p>
           </article>
           <article class="card">
             <h3>Agenda</h3>
             <p>Distribui pagar e receber no calendário, com cores por tipo e prioridade por vencimento.</p>
-            <div class="price">Calendário</div>
+            <div class="price"><span class="keep">Calendário</span></div>
             <p>Ajuda a enxergar concentração de caixa, atrasos e compromissos próximos.</p>
           </article>
           <article class="card">
             <h3>Fiscal Assist</h3>
             <p>Organiza entradas, saídas, categorias sugeridas e pontos de validação para envio contábil.</p>
-            <div class="price">Pacote técnico</div>
+            <div class="price compact"><span class="keep">Pacote</span> <span class="keep">técnico</span></div>
             <p>Não calcula imposto. Estrutura a base para validação profissional do contador.</p>
           </article>
         </div>
