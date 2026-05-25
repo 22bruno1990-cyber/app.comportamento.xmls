@@ -1415,29 +1415,21 @@ def load_demo(module):
 def render_sidebar():
     st.sidebar.image("assets/docsignal-mark.svg", width=54)
     st.sidebar.title("DocSmart")
-    st.sidebar.caption("Demos rápidas para apresentação")
-
-    for module in MODULES:
-        if st.sidebar.button(f"Carregar demo {module}", use_container_width=True):
-            load_demo(module)
-
-    if st.sidebar.button("Limpar demo", use_container_width=True):
-        for key in ["demo_module", "demo_base", "demo_secondary", "demo_loaded"]:
-            st.session_state.pop(key, None)
+    st.sidebar.caption("Área operacional para bases reais")
 
     st.sidebar.divider()
-    st.sidebar.markdown("**Como apresentar**")
+    st.sidebar.markdown("**Como usar**")
     st.sidebar.markdown(
         """
-        1. Escolha uma demo.
-        2. Mostre métricas e alertas.
-        3. Baixe o Excel.
-        4. Explique que o cliente envia a base real depois.
+        1. Escolha o tipo de diagnóstico.
+        2. Suba CSV/XLSX da base principal.
+        3. Adicione segunda base quando houver cruzamento.
+        4. Gere a leitura e baixe o Excel.
         """
     )
     st.sidebar.divider()
-    st.sidebar.markdown("**Demos em arquivo**")
-    st.sidebar.caption("Também existem exemplos XLSX na pasta comercial/docsmart.")
+    st.sidebar.markdown("**Simulação comercial**")
+    st.sidebar.caption("Use a landing para apresentar exemplos e posicionamento antes do upload real.")
 
 
 def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
@@ -1707,7 +1699,7 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
         resumo = pd.DataFrame(
             {
                 "Item": [m[0] for m in metrics] + ["Módulo", "Arquivo analisado"],
-                "Valor": [m[1] for m in metrics] + [module, "Demo interna" if using_demo else primary.name],
+                "Valor": [m[1] for m in metrics] + [module, "Simulação" if using_demo else primary.name],
             }
         )
         sheets = {"Resumo": resumo, **sheets}
@@ -1723,60 +1715,49 @@ def render_diagnosis(module, primary, secondary, using_demo, accountant=None):
         st.error(f"Não consegui processar essa base: {exc}")
 
 
-def render_home():
+def render_complete_diagnosis(primary, secondary, accountant):
+    if primary is None:
+        st.warning("Suba uma base principal para iniciar o diagnóstico completo.")
+        return
+
     st.markdown(
         """
-        <div class="home-hero">
-          <div>
-            <small>DocSmart Web</small>
-            <div class="home-title">Diagnóstico rápido para planilhas financeiras.</div>
-            <p>
-              Transforme CSV, Excel e bases exportadas em painel, alertas, sazonalidade,
-              pendências e leitura executiva em poucos minutos.
-            </p>
-          </div>
-          <div class="home-panel">
-            <div class="home-row"><strong>Planilhas</strong><span>R$ 600</span></div>
-            <div class="home-row"><strong>Agenda</strong><span>R$ 600</span></div>
-            <div class="home-row"><strong>Pagamentos</strong><span>R$ 700</span></div>
-            <div class="home-row"><strong>Cobrança</strong><span>R$ 700</span></div>
-            <div class="home-row"><strong>Fiscal Assist</strong><span>R$ 900</span></div>
-          </div>
+        <div class="note">
+        Diagnóstico completo roda uma primeira leitura ampla: Painel, Agenda, Pagamentos, Cobrança e Fiscal Assist.
+        Cruzamentos dependem de segunda base; Fiscal Assist depende dos dados do responsável contábil.
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown("### Como a demonstração funciona")
-    st.markdown(
-        """
-        <div class="home-steps">
-          <div class="home-step"><strong>1. Escolha o desafio operacional</strong><span>Planilha, pagamento, cobrança, agenda ou pacote para contador.</span></div>
-          <div class="home-step"><strong>2. Carregue a demo</strong><span>A lateral traz exemplos prontos para apresentar sem procurar arquivos.</span></div>
-          <div class="home-step"><strong>3. Gere a entrega</strong><span>O app mostra métricas, alertas, score e baixa um Excel de diagnóstico.</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    col1, col2 = st.columns([0.22, 0.78])
-    if col1.button("Entrar na demo", type="primary", use_container_width=True):
-        st.session_state["entered_demo"] = True
-        st.rerun()
-    col2.info("Use esta tela para abrir a apresentação. Depois, entre na demo e carregue um módulo pela lateral esquerda.")
+    tabs = st.tabs(["Painel", "Agenda", "Pagamentos", "Cobrança", "Fiscal Assist"])
+    with tabs[0]:
+        render_diagnosis("Planilhas", primary, None, False, accountant)
+    with tabs[1]:
+        render_diagnosis("Agenda", primary, None, False, accountant)
+    with tabs[2]:
+        if secondary is None:
+            st.info("Para Pagamentos, suba uma segunda base de extrato/pagamentos exportados.")
+        else:
+            render_diagnosis("Pagamentos", primary, secondary, False, accountant)
+    with tabs[3]:
+        if secondary is None:
+            st.info("Para Cobrança, suba uma segunda base de recebimentos exportados.")
+        else:
+            render_diagnosis("Cobrança", primary, secondary, False, accountant)
+    with tabs[4]:
+        render_diagnosis("Fiscal Assist", primary, None, False, accountant)
 
 
 def main():
     css()
-    if not st.session_state.get("entered_demo"):
-        render_home()
-        return
 
     render_sidebar()
     st.markdown(
         """
         <div class="hero">
           <small>DocSmart Web</small>
-          <div class="hero-title">Diagnóstico rápido por planilha.</div>
-          <p>Escolha o módulo, suba CSV/XLSX e gere uma primeira leitura com métricas, alertas e arquivo de entrega.</p>
+          <div class="hero-title">Diagnóstico operacional por upload.</div>
+          <p>Suba CSV/XLSX reais, escolha uma leitura específica ou rode o diagnóstico completo para mapear pagamentos, cobranças, painel, agenda e pacote fiscal.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1789,58 +1770,55 @@ def main():
 
     with left:
         st.subheader("Configurar diagnóstico")
-        module_names = list(MODULES.keys())
-        default_module = st.session_state.get("demo_module", module_names[0])
-        module = st.selectbox("Módulo", module_names, index=module_names.index(default_module))
+        module_names = ["Diagnóstico completo"] + list(MODULES.keys())
+        module = st.selectbox("Tipo de leitura", module_names, index=0)
         primary = st.file_uploader("Base principal (CSV/XLSX)", type=["csv", "xlsx", "xls"])
         secondary = None
-        if MODULES[module]["needs_secondary"]:
+        if module == "Diagnóstico completo":
+            secondary = st.file_uploader("Base de baixas, pagamentos ou recebimentos (opcional)", type=["csv", "xlsx", "xls"])
+        elif MODULES[module]["needs_secondary"]:
             secondary = st.file_uploader(MODULES[module]["secondary_label"], type=["csv", "xlsx", "xls"])
         accountant = {}
-        if module == "Fiscal Assist":
+        if module in ["Fiscal Assist", "Diagnóstico completo"]:
             st.markdown("#### Responsável contábil")
             accountant = {
-                "empresa": st.text_input("Empresa analisada", value="Empresa demonstração" if st.session_state.get("demo_module") == module else ""),
-                "periodo": st.text_input("Período de competência", value="05/2026" if st.session_state.get("demo_module") == module else ""),
-                "contador": st.text_input("Contador ou escritório contábil", value="Escritório Contábil Exemplo" if st.session_state.get("demo_module") == module else ""),
-                "crc": st.text_input("CRC informado", value="CRC-SP 000000/O-0" if st.session_state.get("demo_module") == module else ""),
-                "email": st.text_input("E-mail contábil", value="contador@exemplo.com.br" if st.session_state.get("demo_module") == module else ""),
+                "empresa": st.text_input("Empresa analisada", value=""),
+                "periodo": st.text_input("Período de competência", value=""),
+                "contador": st.text_input("Contador ou escritório contábil", value=""),
+                "crc": st.text_input("CRC informado", value=""),
+                "email": st.text_input("E-mail contábil", value=""),
             }
             accountant["confirmado"] = st.checkbox(
                 "Confirmo que o pacote será submetido à validação de contador habilitado.",
-                value=st.session_state.get("demo_module") == module,
+                value=False,
                 key="fiscal_confirm",
             )
-        using_demo = bool(st.session_state.get("demo_loaded")) and st.session_state.get("demo_module") == module
-        if using_demo:
-            st.success(f"Demo {module} carregada pela lateral.")
         st.markdown(
             """
             <div class="note">
-            Use uma amostra sem dados sensíveis na primeira validação. O app tenta detectar colunas de valor, data, documento e fornecedor/cliente automaticamente.
+            Use uma base real ou uma amostra sem dados sensíveis. O app tenta detectar colunas de valor, data, documento e fornecedor/cliente automaticamente.
             </div>
             """,
             unsafe_allow_html=True,
         )
         run_clicked = st.button("Gerar diagnóstico", type="primary", use_container_width=True)
-        if run_clicked and primary is None and not using_demo:
-            load_demo(module)
-            st.rerun()
-        run = run_clicked or using_demo
+        run = run_clicked
 
     with right:
         st.subheader("Resultado")
         if not run:
-            st.info("Suba uma base ou carregue uma demo pela lateral esquerda.")
+            st.info("Suba uma base principal e clique em Gerar diagnóstico.")
             return
-        if module == "Agenda":
-            st.info("A demo Agenda aparece abaixo em largura total para preservar o layout de calendário.")
+        if module == "Diagnóstico completo":
+            render_complete_diagnosis(primary, secondary, accountant)
+        elif module == "Agenda":
+            st.info("A Agenda aparece abaixo em largura total para preservar o layout de calendário.")
         else:
-            render_diagnosis(module, primary, secondary, using_demo, accountant)
+            render_diagnosis(module, primary, secondary, False, accountant)
 
     if run and module == "Agenda":
         st.divider()
-        render_diagnosis(module, primary, secondary, using_demo, accountant)
+        render_diagnosis(module, primary, secondary, False, accountant)
 
 
 if __name__ == "__main__":
