@@ -221,6 +221,97 @@ def render_light_theme_css() -> None:
             border: 1px solid var(--mi-line);
             border-radius: 8px;
         }
+        .mi-cover {
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+            gap: 24px;
+            align-items: stretch;
+            padding: 30px;
+            margin: 10px 0 28px;
+            border: 1px solid var(--mi-line);
+            border-radius: 12px;
+            background:
+                radial-gradient(circle at 92% 12%, rgba(183, 121, 31, 0.11), transparent 32%),
+                linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
+            box-shadow: 0 14px 36px rgba(31, 41, 51, 0.07);
+        }
+        .mi-cover__eyebrow {
+            display: inline-flex;
+            width: fit-content;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--mi-inflation-soft);
+            color: #8a5b16;
+            border: 1px solid #ead49c;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .mi-cover h1 {
+            margin: 0;
+            max-width: 760px;
+            font-size: 48px;
+            line-height: 1;
+            font-weight: 760;
+            color: var(--mi-ink);
+        }
+        .mi-cover p {
+            margin: 18px 0 0;
+            color: var(--mi-muted);
+            font-size: 18px;
+            line-height: 1.55;
+            max-width: 720px;
+        }
+        .mi-cover__panel {
+            display: grid;
+            align-content: center;
+            gap: 12px;
+            padding: 22px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid var(--mi-line);
+        }
+        .mi-cover__row {
+            display: grid;
+            grid-template-columns: 38px 1fr;
+            gap: 12px;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
+            background: #ffffff;
+            border: 1px solid #edf0f2;
+        }
+        .mi-cover__icon {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: #eef7f2;
+            color: var(--mi-money-dark);
+            font-weight: 800;
+            font-size: 13px;
+        }
+        .mi-cover__row strong {
+            display: block;
+            color: var(--mi-calc);
+            font-size: 15px;
+        }
+        .mi-cover__row span {
+            display: block;
+            color: var(--mi-muted);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+        @media (max-width: 900px) {
+            .mi-cover {
+                grid-template-columns: 1fr;
+                padding: 22px;
+            }
+            .mi-cover h1 {
+                font-size: 38px;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1461,6 +1552,33 @@ def render_market_reference(receipts: pd.DataFrame, items: pd.DataFrame) -> None
 
 
 def render_importer() -> None:
+    st.markdown(
+        """
+        <section class="mi-cover">
+          <div>
+            <div class="mi-cover__eyebrow">Sua inflação real começa no cupom</div>
+            <h1>Transforme compras de mercado em inteligência financeira.</h1>
+            <p>Suba o QR Code da NFC-e e acompanhe preço por item, categorias, economia por estoque e comparação com a média de mercado.</p>
+          </div>
+          <div class="mi-cover__panel">
+            <div class="mi-cover__row">
+              <div class="mi-cover__icon">QR</div>
+              <div><strong>Importação rápida</strong><span>Link, imagem do QR Code ou HTML da NFC-e.</span></div>
+            </div>
+            <div class="mi-cover__row">
+              <div class="mi-cover__icon">%</div>
+              <div><strong>Inflação item a item</strong><span>Compare sua variação real com referências de mercado.</span></div>
+            </div>
+            <div class="mi-cover__row">
+              <div class="mi-cover__icon">R$</div>
+              <div><strong>Economia por estoque</strong><span>Veja o que você deixou de recomprar porque ainda estava usando.</span></div>
+            </div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.subheader("Importar cupom pelo QR Code")
     st.caption("Cole aqui o link aberto pelo QR Code da NFC-e. Quando a SEFAZ entregar os itens na pagina, o app importa tudo em formato revisavel.")
 
@@ -1539,9 +1657,6 @@ def main() -> None:
     st.set_page_config(page_title="Minha Inflação", page_icon="MI", layout="wide")
     render_light_theme_css()
     init_db()
-
-    st.title("Minha Inflação")
-    st.write("Acompanhe a inflação real da sua compra de mercado a partir dos cupons NFC-e.")
 
     tab_import, tab_dashboard, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
         ["Importar cupom", "Dashboard", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
