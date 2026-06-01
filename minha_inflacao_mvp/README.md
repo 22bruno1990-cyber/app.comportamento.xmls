@@ -8,6 +8,12 @@ MVP em Streamlit para importar cupons NFC-e pelo link do QR Code, revisar os ite
 streamlit run app.py
 ```
 
+Landing comercial em Streamlit:
+
+```bash
+streamlit run landing_app.py
+```
+
 ## Como usar
 
 1. Abra o QR Code do cupom fiscal no celular.
