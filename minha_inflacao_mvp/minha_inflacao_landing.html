@@ -342,6 +342,102 @@
       font-size: 15px;
     }
 
+    .commercial-grid {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .commercial-card {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .commercial-card.highlight {
+      border-color: rgba(47, 143, 107, 0.24);
+      background: #fbfefc;
+    }
+
+    .commercial-card small {
+      color: var(--money-dark);
+      font-weight: 780;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 12px;
+    }
+
+    .commercial-card h3 {
+      margin: 12px 0 10px;
+      font-size: 28px;
+      color: var(--ink);
+      line-height: 1.05;
+    }
+
+    .commercial-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.58;
+    }
+
+    .commercial-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .commercial-list div {
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--ink);
+      line-height: 1.45;
+      font-size: 15px;
+    }
+
+    .commercial-list strong {
+      color: var(--calc);
+    }
+
+    .example-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .example {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .example h3 {
+      margin: 0 0 12px;
+      color: var(--calc);
+      font-size: 20px;
+    }
+
+    .example p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .script {
+      padding: 14px;
+      border-radius: 8px;
+      background: #f7f8f5;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
     .offer {
       display: grid;
       grid-template-columns: 1fr 0.75fr;
@@ -430,7 +526,9 @@
 
       .stats,
       .feature-grid,
-      .flow {
+      .flow,
+      .example-grid,
+      .commercial-grid {
         grid-template-columns: repeat(2, 1fr);
       }
 
@@ -454,7 +552,9 @@
 
       .stats,
       .feature-grid,
-      .flow {
+      .flow,
+      .example-grid,
+      .commercial-grid {
         grid-template-columns: 1fr;
       }
 
@@ -479,6 +579,7 @@
         <a href="#produto">Produto</a>
         <a href="#recursos">Recursos</a>
         <a href="#como-funciona">Como funciona</a>
+        <a href="#comercial">Comercial</a>
         <a class="button primary" href="#piloto">Quero o piloto</a>
       </nav>
     </div>
@@ -598,6 +699,66 @@
             <small>04</small>
             <h3>Planeje a próxima compra</h3>
             <p>Use as estimativas de inflação e economia por estoque para ajustar seu orçamento.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="comercial">
+      <div class="shell">
+        <div class="section-head">
+          <h2>Dois caminhos de venda, uma mesma inteligência.</h2>
+          <p>O individual prova valor e gera recorrência. O grupo aumenta o ticket ao transformar cupons em diagnóstico coletivo e anônimo.</p>
+        </div>
+
+        <div class="commercial-grid">
+          <article class="commercial-card">
+            <small>Oferta individual</small>
+            <h3>Minha Inflação Pessoal</h3>
+            <p>Para famílias, casais e pessoas que querem entender quanto o mercado está pesando no próprio orçamento.</p>
+            <div class="commercial-list">
+              <div><strong>Produto:</strong> app com cupons, dashboard, economia por estoque e projeção anual.</div>
+              <div><strong>Entrada:</strong> teste com 2 ou 3 cupons para gerar o primeiro diagnóstico.</div>
+              <div><strong>Preço sugerido:</strong> R$ 19,90/mês, R$ 149 a R$ 197/ano ou diagnóstico avulso de R$ 97 a R$ 197.</div>
+              <div><strong>Função no funil:</strong> volume, prova social, indicações e porta de entrada para grupos.</div>
+            </div>
+          </article>
+
+          <article class="commercial-card highlight">
+            <small>Oferta de maior ticket</small>
+            <h3>Minha Inflação Grupos</h3>
+            <p>Para condomínios, empresas, associações, consultores e comunidades que querem medir a inflação real de várias famílias sem expor dados individuais.</p>
+            <div class="commercial-list">
+              <div><strong>Produto:</strong> painel individual para participantes + relatório coletivo anônimo para o contratante.</div>
+              <div><strong>Entrega:</strong> cesta média do grupo, vilões de preço, categorias críticas, mercados usados e oportunidades de economia coletiva.</div>
+              <div><strong>Preço sugerido:</strong> piloto de R$ 1.500 a R$ 5.000, conforme tamanho do grupo.</div>
+              <div><strong>Recorrência:</strong> acompanhamento mensal entre R$ 500 e R$ 3.000, com devolutiva e relatório.</div>
+            </div>
+          </article>
+        </div>
+
+        <div class="section-head" style="margin-top: 46px;">
+          <h2>Como vender para grupos.</h2>
+          <p>A conversa começa pelo diagnóstico, não pelo app. O app é o motor; a venda é a leitura coletiva da inflação.</p>
+        </div>
+
+        <div class="example-grid">
+          <article class="example">
+            <h3>Condomínios</h3>
+            <p>Venda para síndicos e administradoras como uma ação de economia para moradores.</p>
+            <div class="script">“Os moradores enviam cupons de mercado e eu entrego um relatório anônimo mostrando a cesta média do condomínio, itens que mais pesaram e oportunidades de compra coletiva.”</div>
+          </article>
+
+          <article class="example">
+            <h3>Empresas e RH</h3>
+            <p>Venda como benefício financeiro prático para colaboradores.</p>
+            <div class="script">“Cada colaborador recebe seu painel pessoal. A empresa recebe apenas uma visão agregada e anônima sobre o impacto da inflação no orçamento das famílias.”</div>
+          </article>
+
+          <article class="example">
+            <h3>Consultores financeiros</h3>
+            <p>Venda como ferramenta de diagnóstico para quem já atende famílias.</p>
+            <div class="script">“O consultor usa os cupons dos clientes para provar onde o custo de vida está subindo e entregar um plano financeiro mais concreto.”</div>
           </article>
         </div>
       </div>
