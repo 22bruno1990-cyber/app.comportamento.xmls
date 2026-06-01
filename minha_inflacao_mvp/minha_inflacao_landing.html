@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minha Inflação | Sua inflação real, item a item</title>
+  <meta name="description" content="Minha Inflação transforma cupons NFC-e de mercado em um painel pessoal de inflação, economia por estoque e planejamento de compras.">
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #e4e7ec;
+      --paper: #f7f8f5;
+      --panel: #ffffff;
+      --money: #2f8f6b;
+      --money-dark: #1f6f55;
+      --calc: #2f4f68;
+      --warn: #b7791f;
+      --warn-soft: #fff8e8;
+      --shadow: 0 18px 50px rgba(31, 41, 51, 0.11);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .shell {
+      width: min(1160px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(18px);
+      background: rgba(247, 248, 245, 0.86);
+      border-bottom: 1px solid rgba(228, 231, 236, 0.8);
+    }
+
+    .nav {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 760;
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: #eef7f2;
+      color: var(--money-dark);
+      border: 1px solid rgba(47, 143, 107, 0.22);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      border-radius: 8px;
+      border: 1px solid #cfd6dd;
+      background: #fff;
+      color: var(--calc);
+      font-weight: 680;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .button.primary {
+      background: #eef7f2;
+      border-color: rgba(47, 143, 107, 0.35);
+      color: var(--money-dark);
+    }
+
+    main {
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 72px 0 42px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+      gap: 52px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid rgba(183, 121, 31, 0.22);
+      background: var(--warn-soft);
+      color: #8a5b16;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      max-width: 720px;
+      font-size: clamp(44px, 5.4vw, 76px);
+      line-height: 0.95;
+      font-weight: 820;
+      letter-spacing: 0;
+      color: var(--ink);
+    }
+
+    .hero p {
+      max-width: 590px;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+
+    .hero-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .product-frame {
+      border-radius: 12px;
+      padding: 10px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      transform: rotate(0.6deg);
+    }
+
+    .browser-bar {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d0d5dd;
+    }
+
+    .dot:nth-child(1) {
+      background: #e8a23a;
+    }
+
+    .dot:nth-child(2) {
+      background: #a9b6c2;
+    }
+
+    .dot:nth-child(3) {
+      background: var(--money);
+    }
+
+    .product-frame img {
+      width: 100%;
+      display: block;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      padding: 24px 0 58px;
+    }
+
+    .stat {
+      padding: 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .stat strong {
+      display: block;
+      color: var(--money-dark);
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    section {
+      padding: 64px 0;
+      border-top: 1px solid rgba(228, 231, 236, 0.85);
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 28px;
+      margin-bottom: 30px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      max-width: 720px;
+      color: var(--calc);
+      font-size: clamp(30px, 3.2vw, 46px);
+      line-height: 1.05;
+    }
+
+    .section-head p {
+      margin: 0;
+      max-width: 430px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 16px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .feature {
+      min-height: 210px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .feature .icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: #f4f7f5;
+      color: var(--money-dark);
+      border: 1px solid var(--line);
+      margin-bottom: 18px;
+      font-weight: 800;
+    }
+
+    .feature h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      color: var(--ink);
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .step {
+      padding: 22px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+    }
+
+    .step small {
+      color: var(--money-dark);
+      font-weight: 780;
+    }
+
+    .step h3 {
+      margin: 14px 0 8px;
+      font-size: 18px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .offer {
+      display: grid;
+      grid-template-columns: 1fr 0.75fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .offer-main,
+    .offer-side {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 30px;
+    }
+
+    .offer-main h2 {
+      margin: 0;
+      font-size: clamp(32px, 3.8vw, 52px);
+      line-height: 1;
+      color: var(--ink);
+    }
+
+    .offer-main p {
+      margin: 18px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 680px;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 14px;
+      margin-top: 24px;
+      color: var(--ink);
+    }
+
+    .check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .check::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      margin-top: 8px;
+      border-radius: 50%;
+      background: var(--money);
+      flex: 0 0 auto;
+    }
+
+    .price {
+      font-size: 44px;
+      line-height: 1;
+      font-weight: 820;
+      color: var(--money-dark);
+      margin: 4px 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    footer {
+      padding: 34px 0 46px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+    }
+
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid,
+      .offer,
+      .section-head {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+
+      .stats,
+      .feature-grid,
+      .flow {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100% - 28px, 1160px);
+      }
+
+      .hero {
+        padding-top: 48px;
+      }
+
+      .hero-grid {
+        gap: 34px;
+      }
+
+      .stats,
+      .feature-grid,
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .product-frame {
+        transform: none;
+      }
+
+      .button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell nav">
+      <a class="brand" href="#">
+        <span class="mark">MI</span>
+        <span>Minha Inflação</span>
+      </a>
+      <nav class="nav-links" aria-label="Navegação principal">
+        <a href="#produto">Produto</a>
+        <a href="#recursos">Recursos</a>
+        <a href="#como-funciona">Como funciona</a>
+        <a class="button primary" href="#piloto">Quero o piloto</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="produto">
+      <div class="shell hero-grid">
+        <div>
+          <div class="eyebrow">Inflação pessoal a partir do cupom fiscal</div>
+          <h1>Minha Inflação</h1>
+          <p>Um app para transformar cupons NFC-e de mercado em uma leitura clara da sua inflação real: preço por item, categorias, economia por estoque e planejamento do orçamento.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#piloto">Começar piloto</a>
+            <a class="button" href="#recursos">Ver recursos</a>
+          </div>
+          <div class="hero-note">Pensado para famílias, autônomos e pequenos negócios que querem entender o custo real do carrinho.</div>
+        </div>
+
+        <div class="product-frame" aria-label="Prévia do app Minha Inflação">
+          <div class="browser-bar">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span>minha-inflacao.app</span>
+          </div>
+          <img src="assets/minha-inflacao-app.png" alt="Tela do aplicativo Minha Inflação com importação de cupom NFC-e">
+        </div>
+      </div>
+    </section>
+
+    <div class="shell stats">
+      <div class="stat">
+        <strong>QR Code</strong>
+        <span>Importação direta pela NFC-e, sem depender de digitar produto por produto.</span>
+      </div>
+      <div class="stat">
+        <strong>Item a item</strong>
+        <span>Preço unitário, categoria, mercado e histórico organizado em uma base própria.</span>
+      </div>
+      <div class="stat">
+        <strong>Estoque</strong>
+        <span>Economia estimada quando um item não aparece porque ainda está em uso.</span>
+      </div>
+      <div class="stat">
+        <strong>Orçamento</strong>
+        <span>Simulação de quanto reservar para proteger sua compra da inflação.</span>
+      </div>
+    </div>
+
+    <section id="recursos">
+      <div class="shell">
+        <div class="section-head">
+          <h2>O índice que importa é o da sua casa.</h2>
+          <p>IPCA ajuda a entender o país. O Minha Inflação mostra a variação do que você realmente compra, nos mercados que você realmente frequenta.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="icon">R$</div>
+            <h3>Inflação pessoal</h3>
+            <p>Compare o preço unitário dos produtos ao longo dos cupons e veja quais itens estão pressionando seu carrinho.</p>
+          </article>
+          <article class="feature">
+            <div class="icon">%</div>
+            <h3>Ranking de impacto</h3>
+            <p>Descubra quais categorias e produtos pesam mais no total da compra, sem achismo.</p>
+          </article>
+          <article class="feature">
+            <div class="icon">Σ</div>
+            <h3>Economia por estoque</h3>
+            <p>Se você não comprou de novo, o app considera que ainda está usando a compra anterior e estima a compra evitada.</p>
+          </article>
+          <article class="feature">
+            <div class="icon">QR</div>
+            <h3>Leitura NFC-e</h3>
+            <p>Cole o link do QR Code ou envie a imagem para importar os itens direto da página fiscal.</p>
+          </article>
+          <article class="feature">
+            <div class="icon">AB</div>
+            <h3>Agrupamento inteligente</h3>
+            <p>Produtos abreviados pela SEFAZ viram nomes acompanháveis, com regras que aprendem suas correções.</p>
+          </article>
+          <article class="feature">
+            <div class="icon">12</div>
+            <h3>Planejamento anual</h3>
+            <p>Projete sua compra e saiba quanto precisa reservar para cobrir a sua inflação nos próximos meses.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="como-funciona">
+      <div class="shell">
+        <div class="section-head">
+          <h2>Do cupom ao painel em poucos passos.</h2>
+          <p>O fluxo foi desenhado para ser simples no dia a dia e confiável o suficiente para virar histórico.</p>
+        </div>
+
+        <div class="flow">
+          <article class="step">
+            <small>01</small>
+            <h3>Abra o QR Code</h3>
+            <p>Use o cupom fiscal NFC-e do mercado e copie o link ou envie a imagem do QR.</p>
+          </article>
+          <article class="step">
+            <small>02</small>
+            <h3>Revise os itens</h3>
+            <p>Confirme produto, categoria, quantidade e preço antes de salvar no histórico.</p>
+          </article>
+          <article class="step">
+            <small>03</small>
+            <h3>Acompanhe os gráficos</h3>
+            <p>Veja gasto por categoria, ranking de produtos e variação de preço ao longo dos cupons.</p>
+          </article>
+          <article class="step">
+            <small>04</small>
+            <h3>Planeje a próxima compra</h3>
+            <p>Use as estimativas de inflação e economia por estoque para ajustar seu orçamento.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="piloto">
+      <div class="shell offer">
+        <div class="offer-main">
+          <h2>Piloto Minha Inflação</h2>
+          <p>Uma versão inicial para validar com usuários reais, usando seus próprios cupons e gerando um diagnóstico pessoal do carrinho de mercado.</p>
+          <div class="checklist">
+            <div class="check">Importação de cupons NFC-e por QR Code.</div>
+            <div class="check">Dashboard pessoal com categorias, produtos e mercado.</div>
+            <div class="check">Aba de economia por itens não recomprados.</div>
+            <div class="check">Ajuste manual de categorias e agrupamentos.</div>
+          </div>
+        </div>
+
+        <aside class="offer-side">
+          <div class="muted">Oferta de validação</div>
+          <div class="price">Piloto</div>
+          <p class="muted">Ideal para testar com 10 a 30 famílias, condomínios, consultorias financeiras ou clubes de benefícios.</p>
+          <div style="height: 18px"></div>
+          <a class="button primary" href="mailto:contato@minhainflacao.app?subject=Quero%20testar%20o%20Minha%20Infla%C3%A7%C3%A3o">Quero conversar</a>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-row">
+      <span>Minha Inflação</span>
+      <span>Sua inflação real, calculada a partir do que você compra.</span>
+    </div>
+  </footer>
+</body>
+</html>
