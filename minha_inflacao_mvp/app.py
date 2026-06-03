@@ -892,6 +892,104 @@ def render_projection(items: pd.DataFrame) -> None:
         m3.metric("Aumento anual estimado", money(annual_gap))
 
 
+def estimate_personal_inflation_rate(items: pd.DataFrame) -> tuple[float, str]:
+    comparison = build_personal_vs_market(items)
+    if not comparison.empty:
+        weights = comparison["latest_unit_price"].clip(lower=0.01)
+        rate = (comparison["my_rate_pct"] * weights).sum() / weights.sum()
+        return float(max(rate, 0.0)), "Inflação observada nos seus itens repetidos"
+
+    market = build_market_reference(items)
+    if not market.empty and market["current_total"].sum() > 0:
+        rate = (market["market_rate_pct"] * market["current_total"]).sum() / market["current_total"].sum()
+        return float(max(rate, 0.0)), "Média de mercado estimada para sua cesta atual"
+
+    return 4.5, "Teto da meta de inflação como referência inicial"
+
+
+def render_annual_plan(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    st.subheader("Plano anual de poder de compra")
+    st.write(
+        "Esta aba transforma seus cupons em uma resposta prática: quanto eu preciso acrescentar no próximo ano para manter o mesmo padrão de compra?"
+    )
+
+    if items.empty:
+        st.info("Importe ao menos um cupom para montar seu plano anual.")
+        return
+
+    base_purchase = float(items["total_price"].sum() / max(items["receipt_id"].nunique(), 1))
+    suggested_rate, source = estimate_personal_inflation_rate(items)
+
+    with st.container(border=True):
+        col1, col2, col3 = st.columns(3)
+        purchases_per_month = col1.number_input("Compras parecidas por mês", min_value=1, max_value=12, value=1, step=1, key="annual_plan_purchases")
+        chosen_rate = col2.slider(
+            "Inflação usada no plano",
+            min_value=0.0,
+            max_value=12.0,
+            value=round(min(max(suggested_rate, 0.0), 12.0) * 2) / 2,
+            step=0.5,
+            key="annual_plan_rate",
+        )
+        months = col3.slider("Meses do próximo ano", min_value=1, max_value=12, value=12, step=1, key="annual_plan_months")
+
+        monthly_now = base_purchase * purchases_per_month
+        monthly_needed = monthly_now * (1 + chosen_rate / 100)
+        monthly_increase = monthly_needed - monthly_now
+        annual_now = monthly_now * months
+        annual_needed = monthly_needed * months
+        annual_increase = annual_needed - annual_now
+
+        st.caption(f"Referência inicial sugerida: {source} ({suggested_rate:.1f}% a.a.). Você pode ajustar a régua acima.")
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Gasto mensal atual", money(monthly_now))
+        m2.metric("Mensal necessário", money(monthly_needed), delta=money(monthly_increase))
+        m3.metric("Aumento anual necessário", money(annual_increase))
+        m4.metric("Orçamento anual protegido", money(annual_needed))
+
+    st.subheader("Leitura do plano")
+    st.markdown(
+        f"""
+        Com base nos cupons analisados, sua referência mensal atual é **{money(monthly_now)}**.
+
+        Se a inflação usada no plano for de **{chosen_rate:.1f}% ao ano**, você precisaria acrescentar cerca de **{money(monthly_increase)} por mês**.
+
+        Para **{months} meses**, isso representa um **aumento anual necessário de {money(annual_increase)}** para preservar o poder de compra da sua cesta atual.
+        """
+    )
+
+    category = (
+        items.groupby("category", as_index=False)["total_price"]
+        .sum()
+        .sort_values("total_price", ascending=False)
+    )
+    category["monthly_now"] = category["total_price"] / max(items["receipt_id"].nunique(), 1) * purchases_per_month
+    category["monthly_increase"] = category["monthly_now"] * (chosen_rate / 100)
+    category["annual_increase"] = category["monthly_increase"] * months
+
+    st.subheader("Aumento anual por categoria")
+    left, right = st.columns([1.05, 0.95])
+    with left:
+        st.bar_chart(category.set_index("category")["annual_increase"])
+    with right:
+        st.dataframe(
+            category.assign(
+                monthly_now=category["monthly_now"].map(money),
+                monthly_increase=category["monthly_increase"].map(money),
+                annual_increase=category["annual_increase"].map(money),
+            )[["category", "monthly_now", "monthly_increase", "annual_increase"]],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "category": "Categoria",
+                "monthly_now": "Base mensal",
+                "monthly_increase": "Acréscimo mensal",
+                "annual_increase": "Aumento anual",
+            },
+        )
+
+
 def render_product_explorer(items: pd.DataFrame) -> None:
     if items.empty:
         return
@@ -1730,22 +1828,22 @@ def render_importer() -> None:
         """
         <section class="mi-cover">
           <div>
-            <div class="mi-cover__eyebrow">Sua inflação real começa no cupom</div>
-            <h1>Transforme compras de mercado em inteligência financeira.</h1>
-            <p>Suba o QR Code da NFC-e e acompanhe preço por item, categorias, economia por estoque e comparação com a média de mercado.</p>
+            <div class="mi-cover__eyebrow">Nasceu de uma compra de mercado que assustou</div>
+            <h1>Minha Inflação</h1>
+            <p>Eu criei este painel para entender onde a minha compra ficou mais cara. A ideia é simples: subir os cupons, acompanhar item por item e enxergar se a inflação chegou de verdade na minha cesta.</p>
           </div>
           <div class="mi-cover__panel">
             <div class="mi-cover__row">
               <div class="mi-cover__icon">QR</div>
-              <div><strong>Importação rápida</strong><span>Link, imagem do QR Code ou HTML da NFC-e.</span></div>
+              <div><strong>Começo pelo cupom</strong><span>Leio o QR Code da NFC-e para organizar a compra sem digitar item por item.</span></div>
             </div>
             <div class="mi-cover__row">
               <div class="mi-cover__icon">%</div>
-              <div><strong>Inflação item a item</strong><span>Compare sua variação real com referências de mercado.</span></div>
+              <div><strong>Olho produto por produto</strong><span>Vejo preço, categoria e variação para entender o que realmente pesou.</span></div>
             </div>
             <div class="mi-cover__row">
               <div class="mi-cover__icon">R$</div>
-              <div><strong>Economia por estoque</strong><span>Veja o que você deixou de recomprar porque ainda estava usando.</span></div>
+              <div><strong>Uso como um guia pessoal</strong><span>Comparo minha cesta com referências de mercado e planejo a próxima compra com mais clareza.</span></div>
             </div>
           </div>
         </section>
@@ -1832,8 +1930,8 @@ def main() -> None:
     render_light_theme_css()
     init_db()
 
-    tab_import, tab_dashboard, tab_ipca, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
-        ["Importar cupom", "Dashboard", "9 grupos IPCA", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
+    tab_import, tab_dashboard, tab_plan, tab_ipca, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
+        ["Importar cupom", "Dashboard", "Plano anual", "9 grupos IPCA", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
     )
     receipts, items = load_history()
 
@@ -1842,6 +1940,9 @@ def main() -> None:
 
     with tab_dashboard:
         render_dashboard(receipts, items)
+
+    with tab_plan:
+        render_annual_plan(receipts, items)
 
     with tab_ipca:
         render_ipca_groups_guide(receipts, items)
