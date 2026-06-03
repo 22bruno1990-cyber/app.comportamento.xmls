@@ -33,6 +33,71 @@ CATEGORIES = [
     "Pet",
     "Utilidades",
 ]
+IPCA_GROUPS = [
+    {
+        "group": "Alimentação e bebidas",
+        "plain_language": "Mercado, comida em casa, bebidas e alimentação fora.",
+        "app_examples": "arroz, leite, carnes, hortifruti, café, snacks, bebidas",
+    },
+    {
+        "group": "Habitação",
+        "plain_language": "Moradia e contas da casa.",
+        "app_examples": "produtos de limpeza, gás, energia, água e condomínio quando cadastrados",
+    },
+    {
+        "group": "Artigos de residência",
+        "plain_language": "Itens para casa, móveis, eletros e utensílios.",
+        "app_examples": "utensílios e itens domésticos quando aparecerem nos cupons",
+    },
+    {
+        "group": "Vestuário",
+        "plain_language": "Roupas, calçados e acessórios.",
+        "app_examples": "não aparece no cupom de mercado, mas pode entrar em compras futuras",
+    },
+    {
+        "group": "Transportes",
+        "plain_language": "Combustível, transporte público, apps, veículo e manutenção.",
+        "app_examples": "não aparece no cupom de mercado, mas pode entrar em despesas cadastradas",
+    },
+    {
+        "group": "Saúde e cuidados pessoais",
+        "plain_language": "Farmácia, higiene, plano de saúde e cuidados pessoais.",
+        "app_examples": "higiene pessoal, absorvente, shampoo, escova, itens de farmácia",
+    },
+    {
+        "group": "Despesas pessoais",
+        "plain_language": "Serviços pessoais, lazer, pet e gastos diversos.",
+        "app_examples": "pet, lazer e serviços quando cadastrados",
+    },
+    {
+        "group": "Educação",
+        "plain_language": "Escola, cursos, mensalidades e material escolar.",
+        "app_examples": "pode entrar em despesas cadastradas fora do cupom de mercado",
+    },
+    {
+        "group": "Comunicação",
+        "plain_language": "Internet, celular, telefone e serviços digitais.",
+        "app_examples": "pode entrar em despesas cadastradas fora do cupom de mercado",
+    },
+]
+CATEGORY_TO_IPCA_GROUP = {
+    "Arroz, feijão e grãos": "Alimentação e bebidas",
+    "Bebidas": "Alimentação e bebidas",
+    "Bebê e infantil": "Saúde e cuidados pessoais",
+    "Café e mercearia": "Alimentação e bebidas",
+    "Carnes e ovos": "Alimentação e bebidas",
+    "Congelados": "Alimentação e bebidas",
+    "Doces e snacks": "Alimentação e bebidas",
+    "Farmácia": "Saúde e cuidados pessoais",
+    "Higiene": "Saúde e cuidados pessoais",
+    "Hortifruti": "Alimentação e bebidas",
+    "Laticínios": "Alimentação e bebidas",
+    "Limpeza": "Habitação",
+    "Mercearia geral": "Alimentação e bebidas",
+    "Padaria": "Alimentação e bebidas",
+    "Pet": "Despesas pessoais",
+    "Utilidades": "Artigos de residência",
+}
 
 
 @dataclass
@@ -349,6 +414,10 @@ def categorize(name: str) -> str:
 
 def raw_product_key(name: str) -> str:
     return normalize_product_name(name)
+
+
+def category_to_ipca_group(category: str) -> str:
+    return CATEGORY_TO_IPCA_GROUP.get(str(category), "Alimentação e bebidas")
 
 
 def extract_access_key(url: str, page_text: str = "") -> str:
@@ -725,6 +794,7 @@ def load_history() -> tuple[pd.DataFrame, pd.DataFrame]:
         )
         items["saved_category"] = items["category"]
         items["suggested_category"] = items["product_name"].map(categorize)
+        items["ipca_group"] = items["category"].map(category_to_ipca_group)
     return receipts, items
 
 
@@ -809,7 +879,7 @@ def render_projection(items: pd.DataFrame) -> None:
         col1, col2, col3 = st.columns(3)
         current_basket = float(items["total_price"].sum())
         purchases_per_month = col1.number_input("Compras parecidas por mês", min_value=1, max_value=12, value=1, step=1)
-        expected_inflation = col2.slider("Inflação pessoal esperada no ano", min_value=0, max_value=50, value=8, step=1)
+        expected_inflation = col2.slider("Inflação pessoal esperada no ano", min_value=0.0, max_value=12.0, value=4.5, step=0.5)
         months = col3.slider("Meses de planejamento", min_value=1, max_value=24, value=12, step=1)
 
         monthly_budget = current_basket * purchases_per_month
@@ -819,7 +889,7 @@ def render_projection(items: pd.DataFrame) -> None:
         m1, m2, m3 = st.columns(3)
         m1.metric("Base mensal atual", money(monthly_budget))
         m2.metric("Base mensal protegida", money(protected_budget), delta=money(protected_budget - monthly_budget))
-        m3.metric("Reserva estimada", money(annual_gap))
+        m3.metric("Aumento anual estimado", money(annual_gap))
 
 
 def render_product_explorer(items: pd.DataFrame) -> None:
@@ -1551,6 +1621,110 @@ def render_market_reference(receipts: pd.DataFrame, items: pd.DataFrame) -> None
         )
 
 
+def render_ipca_groups_guide(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    st.subheader("9 grupos do IPCA")
+    st.write(
+        "O IPCA oficial mede a inflação em 9 grupos de consumo. "
+        "O Minha Inflação usa essa estrutura como linguagem didática, mas calcula a inflação da pessoa ou do grupo com base nos itens realmente importados."
+    )
+
+    col1, col2 = st.columns([0.58, 0.42])
+
+    official = pd.DataFrame(IPCA_GROUPS)
+    with col1:
+        st.markdown("**Visão oficial, traduzida para o uso do app**")
+        st.dataframe(
+            official,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "group": "Grupo IPCA",
+                "plain_language": "O que significa",
+                "app_examples": "Como pode aparecer no Minha Inflação",
+            },
+        )
+
+    with col2:
+        st.markdown("**Como ler o cálculo no app**")
+        st.info(
+            "Individual: o app calcula a inflação da sua cesta. "
+            "Grupo: o mesmo cálculo pode ser agregado e anonimizado para famílias, condomínios, empresas ou comunidades."
+        )
+        st.markdown(
+            """
+            O IPCA completo inclui despesas que não aparecem em cupom de mercado, como aluguel, energia, transporte, educação e internet.
+
+            Por isso, quando você sobe apenas cupons de supermercado, a cobertura tende a ficar concentrada em:
+            - Alimentação e bebidas
+            - Habitação, quando houver limpeza doméstica
+            - Saúde e cuidados pessoais, quando houver higiene/farmácia
+            """
+        )
+
+    st.divider()
+    st.subheader("Cobertura atual da sua base")
+    if items.empty:
+        st.info("Importe um cupom para ver quais grupos do IPCA já aparecem na sua inflação individual.")
+        return
+
+    coverage = (
+        items.groupby("ipca_group", as_index=False)
+        .agg(
+            total_price=("total_price", "sum"),
+            items=("id", "count"),
+            products=("normalized_name", "nunique"),
+        )
+        .sort_values("total_price", ascending=False)
+    )
+    all_groups = pd.DataFrame({"ipca_group": [item["group"] for item in IPCA_GROUPS]})
+    coverage = all_groups.merge(coverage, on="ipca_group", how="left").fillna(
+        {"total_price": 0, "items": 0, "products": 0}
+    )
+    total = float(coverage["total_price"].sum())
+    coverage["share"] = coverage["total_price"].apply(lambda value: (value / total * 100) if total else 0)
+    coverage["status"] = coverage["total_price"].apply(lambda value: "Com dados dos cupons" if value > 0 else "Sem dados ainda")
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Grupos com dados", int((coverage["total_price"] > 0).sum()))
+    m2.metric("Grupos oficiais", len(IPCA_GROUPS))
+    m3.metric("Base analisada", money(total))
+
+    left, right = st.columns([1.05, 0.95])
+    with left:
+        chart = coverage[coverage["total_price"] > 0].set_index("ipca_group")["total_price"]
+        if chart.empty:
+            st.info("Nenhum grupo com gasto identificado ainda.")
+        else:
+            st.bar_chart(chart)
+    with right:
+        display = coverage.copy()
+        st.dataframe(
+            display.assign(
+                total_price=display["total_price"].map(money),
+                share=display["share"].map(lambda value: f"{value:.1f}%"),
+                items=display["items"].astype(int),
+                products=display["products"].astype(int),
+            ),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "ipca_group": "Grupo IPCA",
+                "total_price": "Valor na base",
+                "items": "Itens",
+                "products": "Produtos",
+                "share": "Peso",
+                "status": "Status",
+            },
+        )
+
+    with st.expander("Por que isso importa?"):
+        st.write(
+            "Quando o usuário vê os 9 grupos, ele entende que o app não está tentando copiar o IPCA oficial. "
+            "Ele está criando um índice individual ou coletivo em cima da cesta real daquela pessoa ou daquele grupo. "
+            "Quanto mais tipos de despesas forem cadastrados, mais ampla fica a leitura da inflação pessoal."
+        )
+
+
 def render_importer() -> None:
     st.markdown(
         """
@@ -1658,8 +1832,8 @@ def main() -> None:
     render_light_theme_css()
     init_db()
 
-    tab_import, tab_dashboard, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
-        ["Importar cupom", "Dashboard", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
+    tab_import, tab_dashboard, tab_ipca, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
+        ["Importar cupom", "Dashboard", "9 grupos IPCA", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
     )
     receipts, items = load_history()
 
@@ -1668,6 +1842,9 @@ def main() -> None:
 
     with tab_dashboard:
         render_dashboard(receipts, items)
+
+    with tab_ipca:
+        render_ipca_groups_guide(receipts, items)
 
     with tab_market:
         render_market_reference(receipts, items)
