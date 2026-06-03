@@ -23,6 +23,8 @@ CATEGORIES = [
     "Carnes e ovos",
     "Congelados",
     "Doces e snacks",
+    "Despesas pessoais",
+    "Educação",
     "Farmácia",
     "Higiene",
     "Hortifruti",
@@ -31,6 +33,9 @@ CATEGORIES = [
     "Mercearia geral",
     "Padaria",
     "Pet",
+    "Transportes",
+    "Comunicação",
+    "Vestuário",
     "Utilidades",
 ]
 IPCA_GROUPS = [
@@ -96,7 +101,23 @@ CATEGORY_TO_IPCA_GROUP = {
     "Mercearia geral": "Alimentação e bebidas",
     "Padaria": "Alimentação e bebidas",
     "Pet": "Despesas pessoais",
+    "Transportes": "Transportes",
+    "Comunicação": "Comunicação",
+    "Vestuário": "Vestuário",
+    "Despesas pessoais": "Despesas pessoais",
+    "Educação": "Educação",
     "Utilidades": "Artigos de residência",
+}
+IPCA_GROUP_TO_DEFAULT_CATEGORY = {
+    "Alimentação e bebidas": "Mercearia geral",
+    "Habitação": "Limpeza",
+    "Artigos de residência": "Utilidades",
+    "Vestuário": "Vestuário",
+    "Transportes": "Transportes",
+    "Saúde e cuidados pessoais": "Farmácia",
+    "Despesas pessoais": "Despesas pessoais",
+    "Educação": "Educação",
+    "Comunicação": "Comunicação",
 }
 
 
@@ -661,6 +682,80 @@ def save_receipt(receipt: Receipt, items_df: pd.DataFrame) -> tuple[bool, str]:
                 ),
             )
     return True, "Cupom salvo no historico."
+
+
+def save_manual_expense(expense: dict) -> tuple[bool, str]:
+    description = clean_text(str(expense["description"]))
+    if not description:
+        return False, "Informe uma descrição para a despesa."
+    total = float(expense["total_price"])
+    if total <= 0:
+        return False, "Informe um valor maior que zero."
+
+    quantity = float(expense.get("quantity") or 1)
+    unit_price = total / quantity if quantity else total
+    purchase_date = pd.to_datetime(expense["purchase_date"]).date()
+    source = clean_text(str(expense.get("source") or "Lançamento manual"))
+    ipca_group = str(expense["ipca_group"])
+    category = str(expense.get("category") or IPCA_GROUP_TO_DEFAULT_CATEGORY.get(ipca_group, "Despesas pessoais"))
+    normalized_name = clean_text(str(expense.get("normalized_name") or description)).upper()
+    raw_key = raw_product_key(normalized_name)
+    fingerprint = hashlib.sha1(
+        f"manual|{purchase_date.isoformat()}|{source}|{description}|{total:.2f}".encode("utf-8")
+    ).hexdigest()
+    attachment_ref = "manual"
+    attachment = expense.get("attachment")
+    if attachment is not None:
+        attachments_dir = APP_DIR / "attachments"
+        attachments_dir.mkdir(exist_ok=True)
+        safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", attachment.name)
+        attachment_path = attachments_dir / f"{fingerprint[:12]}_{safe_name}"
+        attachment_path.write_bytes(attachment.getvalue())
+        attachment_ref = str(attachment_path.relative_to(APP_DIR))
+
+    with sqlite3.connect(DB_PATH) as conn:
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO receipts
+                    (fingerprint, access_key, source_url, merchant, purchase_date, total, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    fingerprint,
+                    f"MANUAL-{fingerprint[:12]}",
+                    attachment_ref,
+                    source,
+                    purchase_date.isoformat(),
+                    total,
+                    datetime.now().isoformat(timespec="seconds"),
+                ),
+            )
+        except sqlite3.IntegrityError:
+            return False, "Essa despesa manual parece ja ter sido salva."
+
+        receipt_id = cursor.lastrowid
+        conn.execute(
+            """
+            INSERT INTO items
+                (receipt_id, product_name, raw_key, normalized_name, category, quantity, unit, unit_price, total_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                receipt_id,
+                description,
+                raw_key,
+                normalized_name,
+                category,
+                quantity,
+                str(expense.get("unit") or "UN"),
+                unit_price,
+                total,
+            ),
+        )
+        upsert_product_rule(conn, raw_key, normalized_name, category)
+
+    return True, "Despesa manual salva no historico."
 
 
 def load_product_rules(conn: sqlite3.Connection | None = None) -> dict[str, dict]:
@@ -1925,18 +2020,97 @@ def render_importer() -> None:
             st.warning(message)
 
 
+def render_manual_expense() -> None:
+    st.subheader("Adicionar despesa manual")
+    st.write(
+        "Use esta aba para despesas que não chegam por QR Code de mercado, como aluguel, condomínio, internet, transporte, educação, plano de saúde ou assinaturas."
+    )
+
+    ipca_group_names = [item["group"] for item in IPCA_GROUPS]
+    with st.container(border=True):
+        col1, col2, col3 = st.columns([1.1, 0.9, 1.0])
+        ipca_group = col1.selectbox("Grupo IPCA", ipca_group_names)
+        default_category = IPCA_GROUP_TO_DEFAULT_CATEGORY.get(ipca_group, "Despesas pessoais")
+        category = col2.selectbox(
+            "Categoria interna",
+            CATEGORIES,
+            index=CATEGORIES.index(default_category) if default_category in CATEGORIES else 0,
+        )
+        purchase_date = col3.date_input("Data da despesa", value=date.today())
+
+        description = st.text_input("Descrição", placeholder="Ex.: Condomínio, internet, gasolina, escola, plano de saúde")
+
+        col4, col5, col6 = st.columns([0.8, 0.7, 1.1])
+        total_price = col4.number_input("Valor total", min_value=0.0, step=1.0, format="%.2f")
+        quantity = col5.number_input("Quantidade", min_value=0.01, value=1.0, step=1.0, format="%.2f")
+        source = col6.text_input("Origem/fornecedor", placeholder="Ex.: Enel, Vivo, Uber, escola, condomínio")
+        attachment = st.file_uploader(
+            "Comprovante opcional",
+            type=["pdf", "png", "jpg", "jpeg", "txt"],
+            help="Anexe uma fatura, recibo ou foto quando quiser guardar a origem da despesa.",
+        )
+
+        normalized_name = st.text_input(
+            "Nome acompanhado",
+            value=description.upper() if description else "",
+            placeholder="Como esse gasto deve aparecer nos gráficos",
+        )
+
+        st.caption(
+            "Dica: para despesas recorrentes, use sempre o mesmo nome acompanhado. Assim o app compara a evolução mês a mês."
+        )
+
+        if st.button("Salvar despesa manual", type="primary", use_container_width=True):
+            ok, message = save_manual_expense(
+                {
+                    "description": description,
+                    "normalized_name": normalized_name or description,
+                    "ipca_group": ipca_group,
+                    "category": category,
+                    "purchase_date": purchase_date,
+                    "total_price": total_price,
+                    "quantity": quantity,
+                    "unit": "UN",
+                    "source": source or "Lançamento manual",
+                    "attachment": attachment,
+                }
+            )
+            if ok:
+                st.success(message)
+                st.rerun()
+            else:
+                st.warning(message)
+
+    with st.expander("Quando usar manual em vez de QR Code?"):
+        st.markdown(
+            """
+            Use QR Code para mercado, farmácia, combustível e lojas com NFC-e.
+
+            Use manual para despesas dos outros grupos do IPCA:
+            - Habitação: aluguel, condomínio, luz, água, gás.
+            - Transportes: Uber, ônibus, estacionamento, manutenção.
+            - Educação: escola, curso, material.
+            - Comunicação: internet, celular, streaming.
+            - Saúde: plano, consulta, exame.
+            """
+        )
+
+
 def main() -> None:
     st.set_page_config(page_title="Minha Inflação", page_icon="MI", layout="wide")
     render_light_theme_css()
     init_db()
 
-    tab_import, tab_dashboard, tab_plan, tab_ipca, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
-        ["Importar cupom", "Dashboard", "Plano anual", "9 grupos IPCA", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
+    tab_import, tab_manual, tab_dashboard, tab_plan, tab_ipca, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
+        ["Importar cupom", "Despesa manual", "Dashboard", "Plano anual", "9 grupos IPCA", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
     )
     receipts, items = load_history()
 
     with tab_import:
         render_importer()
+
+    with tab_manual:
+        render_manual_expense()
 
     with tab_dashboard:
         render_dashboard(receipts, items)
