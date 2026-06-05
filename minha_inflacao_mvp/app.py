@@ -965,28 +965,6 @@ def render_single_period_insights(items: pd.DataFrame) -> None:
     col3.metric("Concentração top 10", f"{items.nlargest(10, 'total_price')['total_price'].sum() / spend * 100:.1f}%")
 
 
-def render_projection(items: pd.DataFrame) -> None:
-    if items.empty:
-        return
-
-    with st.container(border=True):
-        st.subheader("Simulador de proteção do orçamento")
-        col1, col2, col3 = st.columns(3)
-        current_basket = float(items["total_price"].sum())
-        purchases_per_month = col1.number_input("Compras parecidas por mês", min_value=1, max_value=12, value=1, step=1)
-        expected_inflation = col2.slider("Inflação pessoal esperada no ano", min_value=0.0, max_value=12.0, value=4.5, step=0.5)
-        months = col3.slider("Meses de planejamento", min_value=1, max_value=24, value=12, step=1)
-
-        monthly_budget = current_basket * purchases_per_month
-        protected_budget = monthly_budget * ((1 + expected_inflation / 100) ** (months / 12))
-        annual_gap = (protected_budget - monthly_budget) * min(months, 12)
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Base mensal atual", money(monthly_budget))
-        m2.metric("Base mensal protegida", money(protected_budget), delta=money(protected_budget - monthly_budget))
-        m3.metric("Aumento anual estimado", money(annual_gap))
-
-
 def estimate_personal_inflation_rate(items: pd.DataFrame) -> tuple[float, str]:
     comparison = build_personal_vs_market(items)
     if not comparison.empty:
@@ -1504,9 +1482,6 @@ def render_dashboard(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
             hide_index=True,
         )
 
-    render_projection(filtered)
-
-
 def compound_rate(*rates: float) -> float:
     factor = 1.0
     for rate in rates:
@@ -1815,7 +1790,7 @@ def render_market_reference(receipts: pd.DataFrame, items: pd.DataFrame) -> None
 
 
 def render_ipca_groups_guide(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
-    st.subheader("9 grupos do IPCA")
+    st.subheader("Grupos IPCA")
     st.write(
         "O IPCA oficial mede a inflação em 9 grupos de consumo. "
         "O Minha Inflação usa essa estrutura como linguagem didática, mas calcula a inflação da pessoa ou do grupo com base nos itens realmente importados."
@@ -1912,7 +1887,7 @@ def render_ipca_groups_guide(receipts: pd.DataFrame, items: pd.DataFrame) -> Non
 
     with st.expander("Por que isso importa?"):
         st.write(
-            "Quando o usuário vê os 9 grupos, ele entende que o app não está tentando copiar o IPCA oficial. "
+            "Quando o usuário vê os grupos IPCA, ele entende que o app não está tentando copiar o IPCA oficial. "
             "Ele está criando um índice individual ou coletivo em cima da cesta real daquela pessoa ou daquele grupo. "
             "Quanto mais tipos de despesas forem cadastrados, mais ampla fica a leitura da inflação pessoal."
         )
@@ -2101,16 +2076,13 @@ def main() -> None:
     render_light_theme_css()
     init_db()
 
-    tab_import, tab_manual, tab_dashboard, tab_plan, tab_ipca, tab_market, tab_savings, tab_adjust, tab_history = st.tabs(
-        ["Importar cupom", "Despesa manual", "Dashboard", "Plano anual", "9 grupos IPCA", "Média de mercado", "Economia", "Ajustar dados", "Histórico"]
+    tab_import, tab_dashboard, tab_plan, tab_ipca, tab_market, tab_savings, tab_manual, tab_adjust, tab_history = st.tabs(
+        ["Importar cupom", "Dashboard", "Plano anual", "Grupos IPCA", "Média de mercado", "Economia", "Despesa manual", "Ajustar dados", "Histórico"]
     )
     receipts, items = load_history()
 
     with tab_import:
         render_importer()
-
-    with tab_manual:
-        render_manual_expense()
 
     with tab_dashboard:
         render_dashboard(receipts, items)
@@ -2126,6 +2098,9 @@ def main() -> None:
 
     with tab_savings:
         render_stock_savings(receipts, items)
+
+    with tab_manual:
+        render_manual_expense()
 
     with tab_adjust:
         render_data_editor(receipts, items)
