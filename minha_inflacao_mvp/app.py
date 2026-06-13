@@ -329,8 +329,6 @@ def render_light_theme_css() -> None:
             border: 1px solid var(--mi-line);
             border-radius: 12px;
             background:
-                linear-gradient(90deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.90) 42%, rgba(255, 255, 255, 0.70) 100%),
-                url("{{HERO_IMAGE}}") center right / cover no-repeat,
                 radial-gradient(circle at 92% 12%, rgba(183, 121, 31, 0.11), transparent 32%),
                 linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
             box-shadow: 0 14px 36px rgba(31, 41, 51, 0.07);
@@ -365,6 +363,20 @@ def render_light_theme_css() -> None:
             font-size: 18px;
             line-height: 1.55;
             max-width: 720px;
+        }
+        .mi-cover__side {
+            display: grid;
+            gap: 14px;
+        }
+        .mi-cover__visual {
+            min-height: 300px;
+            aspect-ratio: 1 / 1;
+            border-radius: 12px;
+            border: 1px solid var(--mi-line);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.20)),
+                url("{{HERO_IMAGE}}") center / cover no-repeat;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 12px 30px rgba(31, 41, 51, 0.08);
         }
         .mi-cover__panel {
             display: grid;
@@ -412,9 +424,10 @@ def render_light_theme_css() -> None:
                 grid-template-columns: 1fr;
                 padding: 22px;
                 background:
-                    linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.91) 100%),
-                    url("{{HERO_IMAGE}}") center / cover no-repeat,
                     linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
+            }
+            .mi-cover__visual {
+                min-height: 220px;
             }
             .mi-cover h1 {
                 font-size: 38px;
@@ -1924,18 +1937,21 @@ def render_cover() -> None:
             <h1>Minha Inflação</h1>
             <p>Eu criei este painel para entender onde a minha compra ficou mais cara. A ideia é simples: subir os cupons, acompanhar item por item e enxergar se a inflação chegou de verdade na minha cesta.</p>
           </div>
-          <div class="mi-cover__panel">
-            <div class="mi-cover__row">
-              <div class="mi-cover__icon">QR</div>
-              <div><strong>Começo pelo cupom</strong><span>Leio o QR Code da NFC-e para organizar a compra sem digitar item por item.</span></div>
-            </div>
-            <div class="mi-cover__row">
-              <div class="mi-cover__icon">%</div>
-              <div><strong>Olho produto por produto</strong><span>Vejo preço, categoria e variação para entender o que realmente pesou.</span></div>
-            </div>
-            <div class="mi-cover__row">
-              <div class="mi-cover__icon">R$</div>
-              <div><strong>Uso como um guia pessoal</strong><span>Comparo minha cesta com referências de mercado e planejo a próxima compra com mais clareza.</span></div>
+          <div class="mi-cover__side">
+            <div class="mi-cover__visual" aria-label="Gráfico de inflação e cupom fiscal"></div>
+            <div class="mi-cover__panel">
+              <div class="mi-cover__row">
+                <div class="mi-cover__icon">QR</div>
+                <div><strong>Começo pelo cupom</strong><span>Leio o QR Code da NFC-e para organizar a compra sem digitar item por item.</span></div>
+              </div>
+              <div class="mi-cover__row">
+                <div class="mi-cover__icon">%</div>
+                <div><strong>Olho produto por produto</strong><span>Vejo preço, categoria e variação para entender o que realmente pesou.</span></div>
+              </div>
+              <div class="mi-cover__row">
+                <div class="mi-cover__icon">R$</div>
+                <div><strong>Uso como um guia pessoal</strong><span>Comparo minha cesta com referências de mercado e planejo a próxima compra com mais clareza.</span></div>
+              </div>
             </div>
           </div>
         </section>
