@@ -18,6 +18,7 @@ import streamlit as st
 APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "minha_inflacao.db"
 HERO_IMAGE_PATH = APP_DIR / "assets" / "minha-inflacao-hero-bg.png"
+FIPE_API_BASE = "https://parallelum.com.br/fipe/api/v1"
 CATEGORIES = [
     "Arroz, feijão e grãos",
     "Bebidas",
@@ -194,6 +195,10 @@ def br_number(value: str | None) -> float:
         return float(cleaned)
     except ValueError:
         return 0.0
+
+
+def parse_fipe_money(value: str | None) -> float:
+    return br_number(value or "")
 
 
 def money(value: float) -> str:
@@ -688,6 +693,13 @@ def fetch_nfce(url: str) -> Receipt:
     response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
     return parse_nfce_html(response.text, url)
+
+
+@st.cache_data(ttl=60 * 60 * 12, show_spinner=False)
+def fipe_get(path: str) -> dict | list:
+    response = requests.get(f"{FIPE_API_BASE}/{path.lstrip('/')}", timeout=20)
+    response.raise_for_status()
+    return response.json()
 
 
 def decode_qr_image(uploaded_file) -> str:
@@ -2272,13 +2284,101 @@ def render_manual_expense() -> None:
         )
 
 
+def render_vehicle_depreciation() -> None:
+    st.subheader("Depreciação veicular")
+    st.write(
+        "Compare o valor de compra do veículo com a referência FIPE atual para entender perda patrimonial, ritmo mensal e impacto anualizado."
+    )
+
+    vehicle_types = {
+        "Carros": "carros",
+        "Motos": "motos",
+        "Caminhões": "caminhoes",
+    }
+
+    fipe_value = 0.0
+    fipe_reference = "Valor manual"
+    vehicle_label = "Veículo"
+
+    try:
+        type_label = st.selectbox("Tipo de veículo", list(vehicle_types.keys()))
+        vehicle_type = vehicle_types[type_label]
+        brands = fipe_get(f"{vehicle_type}/marcas")
+        brand_options = {str(item["nome"]): str(item["codigo"]) for item in brands}
+        brand_name = st.selectbox("Marca FIPE", list(brand_options.keys()))
+
+        models_payload = fipe_get(f"{vehicle_type}/marcas/{brand_options[brand_name]}/modelos")
+        model_options = {str(item["nome"]): str(item["codigo"]) for item in models_payload.get("modelos", [])}
+        model_name = st.selectbox("Modelo FIPE", list(model_options.keys()))
+
+        years = fipe_get(f"{vehicle_type}/marcas/{brand_options[brand_name]}/modelos/{model_options[model_name]}/anos")
+        year_options = {str(item["nome"]): str(item["codigo"]) for item in years}
+        year_name = st.selectbox("Ano / combustível", list(year_options.keys()))
+
+        fipe_payload = fipe_get(
+            f"{vehicle_type}/marcas/{brand_options[brand_name]}/modelos/{model_options[model_name]}/anos/{year_options[year_name]}"
+        )
+        fipe_value = parse_fipe_money(str(fipe_payload.get("Valor") or ""))
+        fipe_reference = str(fipe_payload.get("MesReferencia") or "FIPE atual")
+        vehicle_label = f"{fipe_payload.get('Marca', brand_name)} {fipe_payload.get('Modelo', model_name)}"
+    except Exception as exc:
+        st.warning(f"Não consegui consultar a FIPE agora. Você ainda pode preencher o valor manualmente. Detalhe: {exc}")
+
+    with st.container(border=True):
+        col1, col2, col3 = st.columns(3)
+        purchase_price = col1.number_input("Valor pago na compra", min_value=0.0, step=1000.0, format="%.2f")
+        purchase_date = col2.date_input("Data da compra", value=date(date.today().year, 1, 1))
+        current_value = col3.number_input(
+            "Valor FIPE atual",
+            min_value=0.0,
+            value=float(fipe_value),
+            step=1000.0,
+            format="%.2f",
+            help="O app preenche pela FIPE quando a consulta está disponível. Você pode ajustar manualmente.",
+        )
+
+    if purchase_price <= 0 or current_value <= 0:
+        st.info("Informe o valor de compra e selecione/preencha a FIPE atual para calcular a depreciação.")
+        return
+
+    elapsed_days = max((date.today() - pd.to_datetime(purchase_date).date()).days, 1)
+    elapsed_months = max(elapsed_days / 30.437, 1)
+    depreciation = purchase_price - current_value
+    depreciation_pct = depreciation / purchase_price * 100
+    monthly_depreciation = depreciation / elapsed_months
+    annualized_loss_pct = (1 - (current_value / purchase_price) ** (12 / elapsed_months)) * 100
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Valor de compra", money(purchase_price))
+    m2.metric("FIPE atual", money(current_value), help=f"Referência: {fipe_reference}")
+    m3.metric("Depreciação acumulada", money(depreciation), delta=f"{depreciation_pct:.1f}%")
+    m4.metric("Depreciação mensal", money(monthly_depreciation))
+
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Veículo": vehicle_label[:80],
+                    "Referência FIPE": fipe_reference,
+                    "Meses desde a compra": f"{elapsed_months:.1f}",
+                    "Perda anualizada": f"{annualized_loss_pct:.1f}% a.a.",
+                    "Leitura": "valorizou" if depreciation < 0 else "depreciou",
+                }
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption("A FIPE é referência de mercado. O preço real de venda pode variar por estado, quilometragem, conservação, opcionais e negociação.")
+
+
 def render_analysis_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
     st.subheader("Análises")
     st.write("Compare sua cesta com referências de mercado, veja economias por estoque em uso e entenda a leitura pelos grupos IPCA.")
 
     view = st.radio(
         "Escolha a análise",
-        ["Média de mercado", "Economia", "Grupos IPCA"],
+        ["Média de mercado", "Economia", "Grupos IPCA", "Veículo"],
         horizontal=True,
         label_visibility="collapsed",
         key="analysis_view",
@@ -2288,8 +2388,10 @@ def render_analysis_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
         render_market_reference(receipts, items)
     elif view == "Economia":
         render_stock_savings(receipts, items)
-    else:
+    elif view == "Grupos IPCA":
         render_ipca_groups_guide(receipts, items)
+    else:
+        render_vehicle_depreciation()
 
 
 def render_history(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
