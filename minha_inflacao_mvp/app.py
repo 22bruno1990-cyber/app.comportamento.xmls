@@ -243,8 +243,10 @@ def render_light_theme_css() -> None:
             color: var(--mi-ink);
         }
         .block-container {
-            max-width: 1240px;
-            padding-top: 2.2rem;
+            max-width: min(96vw, 1760px);
+            padding-left: clamp(1rem, 2.4vw, 2.6rem);
+            padding-right: clamp(1rem, 2.4vw, 2.6rem);
+            padding-top: 2rem;
             padding-bottom: 4rem;
         }
         [data-testid="stHeader"] {
