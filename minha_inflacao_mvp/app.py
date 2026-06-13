@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import html
 import re
@@ -15,6 +16,7 @@ import streamlit as st
 
 APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "minha_inflacao.db"
+HERO_IMAGE_PATH = APP_DIR / "assets" / "minha-inflacao-hero-bg.png"
 CATEGORIES = [
     "Arroz, feijão e grãos",
     "Bebidas",
@@ -204,7 +206,15 @@ def clean_text(value: str) -> str:
     return value.strip()
 
 
+def image_data_uri(path: Path) -> str:
+    if not path.exists():
+        return ""
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def render_light_theme_css() -> None:
+    hero_image = image_data_uri(HERO_IMAGE_PATH)
     st.markdown(
         """
         <style>
@@ -308,6 +318,8 @@ def render_light_theme_css() -> None:
             border-radius: 8px;
         }
         .mi-cover {
+            position: relative;
+            overflow: hidden;
             display: grid;
             grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
             gap: 24px;
@@ -317,9 +329,15 @@ def render_light_theme_css() -> None:
             border: 1px solid var(--mi-line);
             border-radius: 12px;
             background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.90) 42%, rgba(255, 255, 255, 0.70) 100%),
+                url("{{HERO_IMAGE}}") center right / cover no-repeat,
                 radial-gradient(circle at 92% 12%, rgba(183, 121, 31, 0.11), transparent 32%),
                 linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
             box-shadow: 0 14px 36px rgba(31, 41, 51, 0.07);
+        }
+        .mi-cover > * {
+            position: relative;
+            z-index: 1;
         }
         .mi-cover__eyebrow {
             display: inline-flex;
@@ -393,13 +411,17 @@ def render_light_theme_css() -> None:
             .mi-cover {
                 grid-template-columns: 1fr;
                 padding: 22px;
+                background:
+                    linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.91) 100%),
+                    url("{{HERO_IMAGE}}") center / cover no-repeat,
+                    linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
             }
             .mi-cover h1 {
                 font-size: 38px;
             }
         }
         </style>
-        """,
+        """.replace("{{HERO_IMAGE}}", hero_image),
         unsafe_allow_html=True,
     )
 
