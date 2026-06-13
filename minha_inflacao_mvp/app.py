@@ -321,9 +321,9 @@ def render_light_theme_css() -> None:
             position: relative;
             overflow: hidden;
             display: grid;
-            grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+            grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
             gap: 24px;
-            align-items: stretch;
+            align-items: center;
             padding: 30px;
             margin: 10px 0 28px;
             border: 1px solid var(--mi-line);
@@ -364,25 +364,22 @@ def render_light_theme_css() -> None:
             line-height: 1.55;
             max-width: 720px;
         }
-        .mi-cover__side {
-            display: grid;
-            gap: 14px;
-        }
         .mi-cover__visual {
-            min-height: 300px;
-            aspect-ratio: 1 / 1;
+            min-height: 330px;
+            aspect-ratio: 16 / 10;
             border-radius: 12px;
             border: 1px solid var(--mi-line);
             background:
                 linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.20)),
-                url("{{HERO_IMAGE}}") center / cover no-repeat;
+                url("{{HERO_IMAGE}}") 74% 52% / cover no-repeat;
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 12px 30px rgba(31, 41, 51, 0.08);
         }
         .mi-cover__panel {
             display: grid;
             align-content: center;
             gap: 12px;
-            padding: 22px;
+            margin-top: 22px;
+            padding: 16px;
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.82);
             border: 1px solid var(--mi-line);
@@ -428,6 +425,7 @@ def render_light_theme_css() -> None:
             }
             .mi-cover__visual {
                 min-height: 220px;
+                aspect-ratio: 16 / 9;
             }
             .mi-cover h1 {
                 font-size: 38px;
@@ -1936,9 +1934,6 @@ def render_cover() -> None:
             <div class="mi-cover__eyebrow">Nasceu de uma compra de mercado que assustou</div>
             <h1>Minha Inflação</h1>
             <p>Eu criei este painel para entender onde a minha compra ficou mais cara. A ideia é simples: subir os cupons, acompanhar item por item e enxergar se a inflação chegou de verdade na minha cesta.</p>
-          </div>
-          <div class="mi-cover__side">
-            <div class="mi-cover__visual" aria-label="Gráfico de inflação e cupom fiscal"></div>
             <div class="mi-cover__panel">
               <div class="mi-cover__row">
                 <div class="mi-cover__icon">QR</div>
@@ -1954,6 +1949,7 @@ def render_cover() -> None:
               </div>
             </div>
           </div>
+          <div class="mi-cover__visual" aria-label="Gráfico de inflação e cupom fiscal"></div>
         </section>
         """,
         unsafe_allow_html=True,
