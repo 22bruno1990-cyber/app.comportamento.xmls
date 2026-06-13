@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import html
+import json
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -935,6 +936,98 @@ def load_history() -> tuple[pd.DataFrame, pd.DataFrame]:
         items["suggested_category"] = items["product_name"].map(categorize)
         items["ipca_group"] = items["category"].map(category_to_ipca_group)
     return receipts, items
+
+
+def export_backup_bytes() -> bytes:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        backup = {
+            "schema": "minha-inflacao-backup-v1",
+            "exported_at": datetime.now().isoformat(timespec="seconds"),
+            "receipts": [dict(row) for row in conn.execute("SELECT * FROM receipts ORDER BY id")],
+            "items": [dict(row) for row in conn.execute("SELECT * FROM items ORDER BY id")],
+            "product_rules": [dict(row) for row in conn.execute("SELECT * FROM product_rules ORDER BY raw_key")],
+        }
+    return json.dumps(backup, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def import_backup_bytes(raw: bytes) -> tuple[int, int, int]:
+    backup = json.loads(raw.decode("utf-8"))
+    if backup.get("schema") != "minha-inflacao-backup-v1":
+        raise ValueError("Arquivo de backup inválido para o Minha Inflação.")
+
+    receipts = backup.get("receipts") or []
+    items = backup.get("items") or []
+    rules = backup.get("product_rules") or []
+    receipt_id_map: dict[int, int] = {}
+    new_receipt_old_ids: set[int] = set()
+    imported_receipts = 0
+    imported_items = 0
+
+    with sqlite3.connect(DB_PATH) as conn:
+        for rule in rules:
+            raw_key = clean_text(str(rule.get("raw_key") or ""))
+            display_name = clean_text(str(rule.get("display_name") or ""))
+            category = str(rule.get("category") or "Mercearia geral")
+            if raw_key and display_name:
+                upsert_product_rule(conn, raw_key, display_name, category)
+
+        for receipt in receipts:
+            old_id = int(receipt["id"])
+            fingerprint = str(receipt.get("fingerprint") or "")
+            existing = conn.execute("SELECT id FROM receipts WHERE fingerprint = ?", (fingerprint,)).fetchone()
+            if existing:
+                receipt_id_map[old_id] = int(existing[0])
+                continue
+
+            cursor = conn.execute(
+                """
+                INSERT INTO receipts
+                    (fingerprint, access_key, source_url, merchant, purchase_date, total, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    fingerprint,
+                    str(receipt.get("access_key") or ""),
+                    str(receipt.get("source_url") or ""),
+                    str(receipt.get("merchant") or "Mercado nao identificado"),
+                    str(receipt.get("purchase_date") or date.today().isoformat()),
+                    float(receipt.get("total") or 0),
+                    str(receipt.get("created_at") or datetime.now().isoformat(timespec="seconds")),
+                ),
+            )
+            receipt_id_map[old_id] = int(cursor.lastrowid)
+            new_receipt_old_ids.add(old_id)
+            imported_receipts += 1
+
+        for item in items:
+            old_receipt_id = int(item.get("receipt_id") or 0)
+            if old_receipt_id not in new_receipt_old_ids:
+                continue
+            new_receipt_id = receipt_id_map[old_receipt_id]
+            product_name = clean_text(str(item.get("product_name") or "Produto"))
+            raw_key = str(item.get("raw_key") or raw_product_key(product_name))
+            conn.execute(
+                """
+                INSERT INTO items
+                    (receipt_id, product_name, raw_key, normalized_name, category, quantity, unit, unit_price, total_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_receipt_id,
+                    product_name,
+                    raw_key,
+                    clean_text(str(item.get("normalized_name") or normalize_product_name(product_name))).upper(),
+                    str(item.get("category") or categorize(product_name)),
+                    float(item.get("quantity") or 1),
+                    str(item.get("unit") or "UN"),
+                    float(item.get("unit_price") or 0),
+                    float(item.get("total_price") or 0),
+                ),
+            )
+            imported_items += 1
+
+    return imported_receipts, imported_items, len(rules)
 
 
 def render_metrics(receipts: pd.DataFrame, items: pd.DataFrame, all_items: pd.DataFrame) -> None:
@@ -2213,7 +2306,7 @@ def render_data_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
 
     view = st.radio(
         "Escolha a área de dados",
-        ["Despesa manual", "Ajustar dados", "Histórico"],
+        ["Despesa manual", "Ajustar dados", "Histórico", "Backup"],
         horizontal=True,
         label_visibility="collapsed",
         key="data_view",
@@ -2223,8 +2316,44 @@ def render_data_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
         render_manual_expense()
     elif view == "Ajustar dados":
         render_data_editor(receipts, items)
-    else:
+    elif view == "Histórico":
         render_history(receipts, items)
+    else:
+        render_backup_tools()
+
+
+def render_backup_tools() -> None:
+    st.subheader("Backup dos dados")
+    st.write(
+        "Use esta área para levar seus cupons do app local para a versão web sem publicar seu banco de dados no GitHub."
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Exportar deste app**")
+        st.caption("Baixe um arquivo JSON com cupons, itens e regras de categorias.")
+        st.download_button(
+            "Baixar backup",
+            data=export_backup_bytes(),
+            file_name=f"minha-inflacao-backup-{date.today().isoformat()}.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    with col2:
+        st.markdown("**Importar em outro app**")
+        st.caption("Na versão web, envie o backup baixado no app local.")
+        backup_file = st.file_uploader("Arquivo de backup JSON", type=["json"])
+        if st.button("Importar backup", type="primary", use_container_width=True, disabled=backup_file is None):
+            try:
+                imported_receipts, imported_items, imported_rules = import_backup_bytes(backup_file.getvalue())
+            except Exception as exc:
+                st.warning(f"Não consegui importar este backup: {exc}")
+            else:
+                st.success(
+                    f"Backup importado: {imported_receipts} cupom(ns), {imported_items} item(ns) e {imported_rules} regra(s) lidas."
+                )
+                st.rerun()
 
 
 def main() -> None:
