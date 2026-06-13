@@ -1089,7 +1089,23 @@ def month_options_from_items(items: pd.DataFrame) -> list[str]:
     return sorted(items["month"].dropna().unique(), reverse=True)
 
 
-def monthly_report_tables(receipts: pd.DataFrame, items: pd.DataFrame, month: str) -> dict[str, pd.DataFrame]:
+def collect_patrimony_report_rows() -> list[dict]:
+    rows = []
+    vehicle = st.session_state.get("vehicle_analysis_report")
+    property_report = st.session_state.get("property_analysis_report")
+    if isinstance(vehicle, dict):
+        rows.append(vehicle)
+    if isinstance(property_report, dict):
+        rows.append(property_report)
+    return rows
+
+
+def monthly_report_tables(
+    receipts: pd.DataFrame,
+    items: pd.DataFrame,
+    month: str,
+    patrimony_rows: list[dict] | None = None,
+) -> dict[str, pd.DataFrame]:
     if items.empty:
         return {"Resumo": pd.DataFrame([{"Mensagem": "Sem dados para gerar relatório."}])}
 
@@ -1182,19 +1198,24 @@ def monthly_report_tables(receipts: pd.DataFrame, items: pd.DataFrame, month: st
         savings_month["period_date"] = savings_month["period_date"].dt.strftime("%d/%m/%Y")
         savings_month["last_purchase_date"] = savings_month["last_purchase_date"].dt.strftime("%d/%m/%Y")
 
-    patrimony_template = pd.DataFrame(
-        [
-            {
-                "Tipo": "Veículo ou Imóvel",
-                "Bem": "",
-                "Data de compra": "",
-                "Valor de compra": "",
-                "Referência atual": "FIPE, FipeZAP, anúncio, laudo ou avaliação",
-                "Valor atual": "",
-                "Depreciação/valorização": "",
-                "Observações": "",
-            }
-        ]
+    patrimony_rows = patrimony_rows or []
+    patrimony = (
+        pd.DataFrame(patrimony_rows)
+        if patrimony_rows
+        else pd.DataFrame(
+            [
+                {
+                    "Tipo": "Veículo ou Imóvel",
+                    "Bem": "",
+                    "Data de compra": "",
+                    "Valor de compra": "",
+                    "Referência atual": "FIPE, FipeZAP, anúncio, laudo ou avaliação",
+                    "Valor atual": "",
+                    "Depreciação/valorização": "",
+                    "Observações": "Calcule em Análises > Veículo ou Análises > Imóvel para preencher automaticamente.",
+                }
+            ]
+        )
     )
 
     return {
@@ -1205,13 +1226,18 @@ def monthly_report_tables(receipts: pd.DataFrame, items: pd.DataFrame, month: st
         "Itens": items_export,
         "Mercado": comparison_month,
         "Economia": savings_month,
-        "Patrimonio_Modelo": patrimony_template,
+        "Patrimonio": patrimony,
     }
 
 
-def build_monthly_excel_report(receipts: pd.DataFrame, items: pd.DataFrame, month: str) -> bytes:
+def build_monthly_excel_report(
+    receipts: pd.DataFrame,
+    items: pd.DataFrame,
+    month: str,
+    patrimony_rows: list[dict] | None = None,
+) -> bytes:
     output = BytesIO()
-    tables = monthly_report_tables(receipts, items, month)
+    tables = monthly_report_tables(receipts, items, month, patrimony_rows=patrimony_rows)
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         for sheet_name, table in tables.items():
             safe_name = sheet_name[:31]
@@ -1227,7 +1253,7 @@ def build_monthly_excel_report(receipts: pd.DataFrame, items: pd.DataFrame, mont
 
 
 def build_monthly_summary_csv(receipts: pd.DataFrame, items: pd.DataFrame, month: str) -> bytes:
-    summary = monthly_report_tables(receipts, items, month)["Resumo"]
+    summary = monthly_report_tables(receipts, items, month, patrimony_rows=collect_patrimony_report_rows())["Resumo"]
     return summary.to_csv(index=False, sep=";").encode("utf-8-sig")
 
 
@@ -2495,6 +2521,20 @@ def render_vehicle_depreciation() -> None:
     depreciation_pct = depreciation / purchase_price * 100
     monthly_depreciation = depreciation / elapsed_months
     annualized_loss_pct = (1 - (current_value / purchase_price) ** (12 / elapsed_months)) * 100
+    st.session_state["vehicle_analysis_report"] = {
+        "Tipo": "Veículo",
+        "Bem": vehicle_label[:120],
+        "Data de compra": pd.to_datetime(purchase_date).date().isoformat(),
+        "Valor de compra": purchase_price,
+        "Referência atual": f"FIPE - {fipe_reference}",
+        "Valor atual": current_value,
+        "Depreciação/valorização": -depreciation,
+        "Variação acumulada (%)": -depreciation_pct,
+        "Variação mensal": -monthly_depreciation,
+        "Variação anualizada (%)": -annualized_loss_pct,
+        "Leitura": "valorizou" if depreciation < 0 else "depreciou",
+        "Observações": "Gerado em Análises > Veículo.",
+    }
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Valor de compra", money(purchase_price))
@@ -2518,6 +2558,7 @@ def render_vehicle_depreciation() -> None:
         hide_index=True,
     )
     st.caption("A FIPE é referência de mercado. O preço real de venda pode variar por estado, quilometragem, conservação, opcionais e negociação.")
+    st.success("Esta análise de veículo será incluída no Excel em Dados > Relatório mensal.")
 
 
 def render_property_valuation(items: pd.DataFrame) -> None:
@@ -2569,6 +2610,24 @@ def render_property_valuation(items: pd.DataFrame) -> None:
     monthly_gain = nominal_gain / elapsed_months
     current_m2 = current_value / area_m2 if area_m2 else 0
     purchase_m2 = purchase_price / area_m2 if area_m2 else 0
+    st.session_state["property_analysis_report"] = {
+        "Tipo": "Imóvel",
+        "Bem": property_label or "Imóvel",
+        "Data de compra": pd.to_datetime(purchase_date).date().isoformat(),
+        "Valor de compra": purchase_price,
+        "Referência atual": reference_source,
+        "Valor atual": current_value,
+        "Depreciação/valorização": nominal_gain,
+        "Variação acumulada (%)": nominal_gain_pct,
+        "Variação mensal": monthly_gain,
+        "Variação anualizada (%)": annualized_nominal_pct,
+        "Ganho/perda real": real_gain,
+        "Ganho/perda real (%)": real_gain_pct,
+        "Compra por m²": purchase_m2 if area_m2 else "",
+        "Atual por m²": current_m2 if area_m2 else "",
+        "Leitura": "ganhou poder de compra" if real_gain >= 0 else "perdeu para a inflação",
+        "Observações": f"Inflação usada: {inflation_rate:.1f}% a.a. Gerado em Análises > Imóvel.",
+    }
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Valor de compra", money(purchase_price))
@@ -2594,6 +2653,7 @@ def render_property_valuation(items: pd.DataFrame) -> None:
     st.caption(
         "FipeZAP e anúncios ajudam como referência, mas imóvel depende de localização, liquidez, padrão, estado de conservação, condomínio, vaga, andar e negociação."
     )
+    st.success("Esta análise de imóvel será incluída no Excel em Dados > Relatório mensal.")
 
 
 def render_analysis_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
@@ -2696,17 +2756,22 @@ def render_data_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
 def render_monthly_report_export(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
     st.subheader("Relatório mensal")
     st.write(
-        "Exporte uma visão agrupada do mês com resumo, categorias, produtos, cupons, itens, comparação de mercado, economia estimada e modelo de patrimônio."
+        "Exporte uma visão agrupada do mês com consumo, inflação, comparação de mercado, economia estimada e análises de patrimônio calculadas na sessão."
     )
 
     months = month_options_from_items(items)
     selected_month = st.selectbox("Mês analisado", months)
+    patrimony_rows = collect_patrimony_report_rows()
+    if patrimony_rows:
+        st.success(f"{len(patrimony_rows)} análise(s) de patrimônio serão incluídas na aba Patrimonio do Excel.")
+    else:
+        st.info("Para incluir carro ou imóvel no Excel, calcule antes em Análises > Veículo ou Análises > Imóvel.")
 
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
             "Baixar Excel completo",
-            data=build_monthly_excel_report(receipts, items, selected_month),
+            data=build_monthly_excel_report(receipts, items, selected_month, patrimony_rows=patrimony_rows),
             file_name=f"minha-inflacao-relatorio-{selected_month}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -2720,7 +2785,7 @@ def render_monthly_report_export(receipts: pd.DataFrame, items: pd.DataFrame) ->
             use_container_width=True,
         )
 
-    preview = monthly_report_tables(receipts, items, selected_month)["Resumo"]
+    preview = monthly_report_tables(receipts, items, selected_month, patrimony_rows=patrimony_rows)["Resumo"]
     st.dataframe(preview, use_container_width=True, hide_index=True)
 
 
