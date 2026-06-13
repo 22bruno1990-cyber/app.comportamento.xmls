@@ -262,9 +262,14 @@ def render_light_theme_css() -> None:
         [data-testid="stMetric"] {
             border-left: 3px solid rgba(43, 128, 102, 0.58);
             border-radius: 10px;
+            padding: 14px 18px 14px 20px;
+            overflow: hidden;
         }
         [data-testid="stMetric"] [data-testid="stMetricValue"] {
             color: var(--mi-money-dark);
+            font-size: clamp(1.55rem, 2.4vw, 2.35rem);
+            line-height: 1.1;
+            white-space: normal;
         }
         div[data-testid="stDataFrame"] {
             background: var(--mi-panel);
@@ -285,20 +290,22 @@ def render_light_theme_css() -> None:
             font-weight: 680;
         }
         .stTabs [data-baseweb="tab-list"] {
-            width: fit-content;
-            gap: 4px;
-            padding: 5px;
+            width: 100%;
+            gap: 6px;
+            padding: 6px;
             border: 1px solid var(--mi-line);
-            border-radius: 999px;
+            border-radius: 14px;
             background: rgba(255, 254, 250, 0.78);
             box-shadow: var(--mi-shadow-soft);
+            overflow-x: auto;
         }
         .stTabs [data-baseweb="tab"] {
             background: transparent;
             border: 0;
-            border-radius: 999px;
+            border-radius: 10px;
             color: var(--mi-muted);
-            padding: 8px 14px;
+            padding: 9px 18px;
+            min-width: max-content;
         }
         .stTabs [aria-selected="true"] {
             background: #ffffff;
