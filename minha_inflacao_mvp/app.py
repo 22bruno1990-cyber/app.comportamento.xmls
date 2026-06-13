@@ -220,32 +220,46 @@ def render_light_theme_css() -> None:
         """
         <style>
         :root {
-            --mi-ink: #1f2933;
+            --mi-ink: #17212b;
             --mi-muted: #667085;
-            --mi-money: #2f8f6b;
-            --mi-money-dark: #1f6f55;
-            --mi-calc: #2f4f68;
-            --mi-inflation: #b7791f;
-            --mi-inflation-soft: #fff8e8;
-            --mi-paper: #f7f8f5;
-            --mi-panel: #ffffff;
-            --mi-line: #e4e7ec;
+            --mi-money: #2b8066;
+            --mi-money-dark: #155f4a;
+            --mi-calc: #24384a;
+            --mi-inflation: #a66f20;
+            --mi-inflation-soft: #fff7e6;
+            --mi-paper: #f6f5ef;
+            --mi-panel: #fffefa;
+            --mi-panel-soft: #fbfaf5;
+            --mi-line: #ded8c8;
+            --mi-line-soft: #eee9dc;
+            --mi-shadow: 0 18px 45px rgba(33, 45, 55, 0.08);
+            --mi-shadow-soft: 0 8px 24px rgba(33, 45, 55, 0.055);
         }
         .stApp {
-            background: var(--mi-paper);
+            background:
+                radial-gradient(circle at 8% 0%, rgba(166, 111, 32, 0.07), transparent 28%),
+                radial-gradient(circle at 96% 8%, rgba(43, 128, 102, 0.08), transparent 30%),
+                linear-gradient(180deg, #fbfaf6 0%, var(--mi-paper) 42%, #f3f1e8 100%);
             color: var(--mi-ink);
         }
+        .block-container {
+            max-width: 1240px;
+            padding-top: 2.2rem;
+            padding-bottom: 4rem;
+        }
         [data-testid="stHeader"] {
-            background: rgba(247, 248, 245, 0.94);
+            background: rgba(251, 250, 246, 0.88);
+            backdrop-filter: blur(10px);
         }
         [data-testid="stMetric"],
         [data-testid="stVerticalBlockBorderWrapper"] {
             background: var(--mi-panel);
             border-color: var(--mi-line);
-            box-shadow: 0 1px 2px rgba(31, 41, 51, 0.04);
+            box-shadow: var(--mi-shadow-soft);
         }
         [data-testid="stMetric"] {
-            border-left: 2px solid rgba(47, 143, 107, 0.55);
+            border-left: 3px solid rgba(43, 128, 102, 0.58);
+            border-radius: 10px;
         }
         [data-testid="stMetric"] [data-testid="stMetricValue"] {
             color: var(--mi-money-dark);
@@ -253,61 +267,68 @@ def render_light_theme_css() -> None:
         div[data-testid="stDataFrame"] {
             background: var(--mi-panel);
             border: 1px solid var(--mi-line);
-            border-radius: 8px;
+            border-radius: 10px;
+            box-shadow: var(--mi-shadow-soft);
+            overflow: hidden;
         }
         h1, h2, h3, p, label, span {
             color: var(--mi-ink);
         }
         h1 {
             color: var(--mi-ink);
-            font-weight: 650;
+            font-weight: 720;
         }
         h2, h3 {
             color: var(--mi-calc);
-            font-weight: 600;
+            font-weight: 680;
         }
         .stTabs [data-baseweb="tab-list"] {
-            gap: 2px;
-            border-bottom: 1px solid var(--mi-line);
+            width: fit-content;
+            gap: 4px;
+            padding: 5px;
+            border: 1px solid var(--mi-line);
+            border-radius: 999px;
+            background: rgba(255, 254, 250, 0.78);
+            box-shadow: var(--mi-shadow-soft);
         }
         .stTabs [data-baseweb="tab"] {
             background: transparent;
             border: 0;
-            border-bottom: 2px solid transparent;
-            border-radius: 0;
+            border-radius: 999px;
             color: var(--mi-muted);
-            padding: 10px 14px;
+            padding: 8px 14px;
         }
         .stTabs [aria-selected="true"] {
-            background: transparent;
-            border-bottom-color: var(--mi-money);
+            background: #ffffff;
+            box-shadow: 0 3px 10px rgba(33, 45, 55, 0.08);
             color: var(--mi-money-dark);
         }
         .stTabs [aria-selected="true"] p {
             color: var(--mi-money-dark);
         }
         .stButton > button {
-            background: #ffffff;
+            background: rgba(255, 254, 250, 0.96);
             color: var(--mi-calc);
-            border: 1px solid #cfd6dd;
+            border: 1px solid var(--mi-line);
             border-radius: 8px;
-            box-shadow: 0 1px 2px rgba(31, 41, 51, 0.04);
-            font-weight: 500;
+            box-shadow: var(--mi-shadow-soft);
+            font-weight: 650;
         }
         .stButton > button:hover {
-            background: #f8faf9;
+            background: #ffffff;
             color: var(--mi-money-dark);
-            border-color: rgba(47, 143, 107, 0.45);
+            border-color: rgba(43, 128, 102, 0.44);
         }
         .stButton > button[kind="primary"] {
-            background: #eef7f2;
-            color: var(--mi-money-dark);
-            border: 1px solid rgba(47, 143, 107, 0.35);
+            background: linear-gradient(135deg, #214f47 0%, #2e715f 100%);
+            color: #ffffff;
+            border: 1px solid rgba(25, 76, 67, 0.72);
+            box-shadow: 0 9px 20px rgba(33, 79, 71, 0.16);
         }
         .stButton > button[kind="primary"]:hover {
-            background: #e4f1eb;
-            color: var(--mi-money-dark);
-            border-color: rgba(47, 143, 107, 0.55);
+            background: linear-gradient(135deg, #1b433c 0%, #286552 100%);
+            color: #ffffff;
+            border-color: rgba(25, 76, 67, 0.88);
         }
         [data-testid="stAlert"] {
             border-color: #ead49c;
@@ -316,7 +337,8 @@ def render_light_theme_css() -> None:
         div[data-testid="stExpander"] {
             background: var(--mi-panel);
             border: 1px solid var(--mi-line);
-            border-radius: 8px;
+            border-radius: 10px;
+            box-shadow: var(--mi-shadow-soft);
         }
         .mi-cover {
             position: relative;
@@ -325,14 +347,22 @@ def render_light_theme_css() -> None:
             grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
             gap: 24px;
             align-items: stretch;
-            padding: 30px;
+            padding: 34px;
             margin: 10px 0 28px;
             border: 1px solid var(--mi-line);
-            border-radius: 12px;
+            border-radius: 14px;
             background:
-                radial-gradient(circle at 92% 12%, rgba(183, 121, 31, 0.11), transparent 32%),
-                linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
-            box-shadow: 0 14px 36px rgba(31, 41, 51, 0.07);
+                radial-gradient(circle at 88% 8%, rgba(166, 111, 32, 0.12), transparent 34%),
+                linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(251, 250, 245, 0.94) 100%);
+            box-shadow: var(--mi-shadow);
+        }
+        .mi-cover::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            border-top: 1px solid rgba(255, 255, 255, 0.9);
+            pointer-events: none;
         }
         .mi-cover > * {
             position: relative;
@@ -353,9 +383,9 @@ def render_light_theme_css() -> None:
         .mi-cover h1 {
             margin: 0;
             max-width: 760px;
-            font-size: 48px;
-            line-height: 1;
-            font-weight: 760;
+            font-size: 54px;
+            line-height: 0.96;
+            font-weight: 820;
             color: var(--mi-ink);
         }
         .mi-cover p {
@@ -369,15 +399,16 @@ def render_light_theme_css() -> None:
             display: flex;
             min-height: 100%;
             padding: 16px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.82);
+            border-radius: 12px;
+            background: rgba(255, 254, 250, 0.78);
             border: 1px solid var(--mi-line);
+            box-shadow: var(--mi-shadow-soft);
         }
         .mi-cover__visual {
             width: 100%;
             min-height: 100%;
-            border-radius: 8px;
-            border: 1px solid #edf0f2;
+            border-radius: 9px;
+            border: 1px solid var(--mi-line-soft);
             background:
                 linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.20)),
                 url("{{HERO_IMAGE}}") 74% 52% / cover no-repeat;
@@ -389,9 +420,10 @@ def render_light_theme_css() -> None:
             gap: 12px;
             margin-top: 22px;
             padding: 16px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.82);
+            border-radius: 12px;
+            background: rgba(255, 254, 250, 0.78);
             border: 1px solid var(--mi-line);
+            box-shadow: var(--mi-shadow-soft);
         }
         .mi-cover__row {
             display: grid;
@@ -399,17 +431,17 @@ def render_light_theme_css() -> None:
             gap: 12px;
             align-items: center;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 9px;
             background: #ffffff;
-            border: 1px solid #edf0f2;
+            border: 1px solid var(--mi-line-soft);
         }
         .mi-cover__icon {
             width: 38px;
             height: 38px;
             display: grid;
             place-items: center;
-            border-radius: 8px;
-            background: #eef7f2;
+            border-radius: 9px;
+            background: linear-gradient(135deg, #edf7f2 0%, #fbf6e8 100%);
             color: var(--mi-money-dark);
             font-weight: 800;
             font-size: 13px;
