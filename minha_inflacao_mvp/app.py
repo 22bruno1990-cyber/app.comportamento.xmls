@@ -2071,13 +2071,102 @@ def render_manual_expense() -> None:
         )
 
 
+def render_analysis_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    st.subheader("Análises")
+    st.write("Compare sua cesta com referências de mercado, veja economias por estoque em uso e entenda a leitura pelos grupos IPCA.")
+
+    view = st.radio(
+        "Escolha a análise",
+        ["Média de mercado", "Economia", "Grupos IPCA"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="analysis_view",
+    )
+
+    if view == "Média de mercado":
+        render_market_reference(receipts, items)
+    elif view == "Economia":
+        render_stock_savings(receipts, items)
+    else:
+        render_ipca_groups_guide(receipts, items)
+
+
+def render_history(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    if receipts.empty:
+        st.info("Nenhum cupom salvo ainda.")
+        return
+
+    st.subheader("Cupons")
+    display = receipts.copy()
+    display["purchase_date"] = display["purchase_date"].dt.strftime("%d/%m/%Y")
+    display["total"] = display["total"].map(money)
+    st.dataframe(
+        display[["purchase_date", "merchant", "total", "access_key"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.subheader("Itens")
+    item_display = items.copy()
+    item_display["purchase_date"] = item_display["purchase_date"].dt.strftime("%d/%m/%Y")
+    item_display["unit_price"] = item_display["unit_price"].map(money)
+    item_display["total_price"] = item_display["total_price"].map(money)
+    st.dataframe(
+        item_display[
+            [
+                "purchase_date",
+                "merchant",
+                "product_name",
+                "normalized_name",
+                "category",
+                "quantity",
+                "unit",
+                "unit_price",
+                "total_price",
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "purchase_date": "Data",
+            "merchant": "Mercado",
+            "product_name": "Produto no cupom",
+            "normalized_name": "Produto acompanhado",
+            "category": "Categoria",
+            "quantity": "Qtd.",
+            "unit": "Un.",
+            "unit_price": "Preço unit.",
+            "total_price": "Total",
+        },
+    )
+
+
+def render_data_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    st.subheader("Dados")
+    st.write("Cadastre despesas fora do QR Code, revise categorias e consulte o histórico que alimenta seus cálculos.")
+
+    view = st.radio(
+        "Escolha a área de dados",
+        ["Despesa manual", "Ajustar dados", "Histórico"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="data_view",
+    )
+
+    if view == "Despesa manual":
+        render_manual_expense()
+    elif view == "Ajustar dados":
+        render_data_editor(receipts, items)
+    else:
+        render_history(receipts, items)
+
+
 def main() -> None:
     st.set_page_config(page_title="Minha Inflação", page_icon="MI", layout="wide")
     render_light_theme_css()
     init_db()
 
-    tab_import, tab_dashboard, tab_plan, tab_ipca, tab_market, tab_savings, tab_manual, tab_adjust, tab_history = st.tabs(
-        ["Importar cupom", "Dashboard", "Plano anual", "Grupos IPCA", "Média de mercado", "Economia", "Despesa manual", "Ajustar dados", "Histórico"]
+    tab_import, tab_dashboard, tab_plan, tab_analysis, tab_data = st.tabs(
+        ["Importar", "Dashboard", "Plano anual", "Análises", "Dados"]
     )
     receipts, items = load_history()
 
@@ -2090,67 +2179,11 @@ def main() -> None:
     with tab_plan:
         render_annual_plan(receipts, items)
 
-    with tab_ipca:
-        render_ipca_groups_guide(receipts, items)
+    with tab_analysis:
+        render_analysis_hub(receipts, items)
 
-    with tab_market:
-        render_market_reference(receipts, items)
-
-    with tab_savings:
-        render_stock_savings(receipts, items)
-
-    with tab_manual:
-        render_manual_expense()
-
-    with tab_adjust:
-        render_data_editor(receipts, items)
-
-    with tab_history:
-        if receipts.empty:
-            st.info("Nenhum cupom salvo ainda.")
-        else:
-            st.subheader("Cupons")
-            display = receipts.copy()
-            display["purchase_date"] = display["purchase_date"].dt.strftime("%d/%m/%Y")
-            display["total"] = display["total"].map(money)
-            st.dataframe(
-                display[["purchase_date", "merchant", "total", "access_key"]],
-                use_container_width=True,
-                hide_index=True,
-            )
-            st.subheader("Itens")
-            item_display = items.copy()
-            item_display["purchase_date"] = item_display["purchase_date"].dt.strftime("%d/%m/%Y")
-            item_display["unit_price"] = item_display["unit_price"].map(money)
-            item_display["total_price"] = item_display["total_price"].map(money)
-            st.dataframe(
-                item_display[
-                    [
-                        "purchase_date",
-                        "merchant",
-                        "product_name",
-                        "normalized_name",
-                        "category",
-                        "quantity",
-                        "unit",
-                        "unit_price",
-                        "total_price",
-                    ]
-                ],
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "purchase_date": "Data",
-                    "merchant": "Mercado",
-                    "product_name": "Produto no cupom",
-                    "normalized_name": "Produto acompanhado",
-                    "category": "Categoria",
-                    "quantity": "Qtd.",
-                    "unit": "Un.",
-                    "unit_price": "Preço unit.",
-                    "total_price": "Total",
-                },
-            )
+    with tab_data:
+        render_data_hub(receipts, items)
 
 
 if __name__ == "__main__":
