@@ -2372,13 +2372,89 @@ def render_vehicle_depreciation() -> None:
     st.caption("A FIPE é referência de mercado. O preço real de venda pode variar por estado, quilometragem, conservação, opcionais e negociação.")
 
 
+def render_property_valuation(items: pd.DataFrame) -> None:
+    st.subheader("Valorização imobiliária")
+    st.write(
+        "Compare o valor de compra do imóvel com uma referência atual de mercado, como FipeZAP, anúncio comparável, avaliação bancária ou laudo."
+    )
+
+    suggested_rate, inflation_source = estimate_personal_inflation_rate(items)
+    default_inflation = round(min(max(suggested_rate, 0.0), 20.0) * 2) / 2
+
+    with st.container(border=True):
+        row1 = st.columns([1.2, 0.9, 0.9])
+        property_label = row1[0].text_input("Imóvel analisado", placeholder="Ex.: Apartamento 2 quartos, Centro")
+        purchase_price = row1[1].number_input("Valor de compra", min_value=0.0, step=10000.0, format="%.2f")
+        purchase_date = row1[2].date_input("Data da compra", value=date(date.today().year, 1, 1), key="property_purchase_date")
+
+        row2 = st.columns([0.9, 0.9, 0.9])
+        current_value = row2[0].number_input("Valor atual de referência", min_value=0.0, step=10000.0, format="%.2f")
+        area_m2 = row2[1].number_input("Área privativa (m²)", min_value=0.0, step=1.0, format="%.2f")
+        inflation_rate = row2[2].number_input(
+            "Inflação de comparação (% a.a.)",
+            min_value=0.0,
+            max_value=30.0,
+            value=float(default_inflation),
+            step=0.5,
+            format="%.1f",
+            help=f"Sugestão inicial: {inflation_source}.",
+        )
+
+        reference_source = st.selectbox(
+            "Fonte do valor atual",
+            ["FipeZAP / preço por m²", "Anúncios comparáveis", "Avaliação bancária", "Laudo de avaliação", "Valor manual"],
+        )
+
+    if purchase_price <= 0 or current_value <= 0:
+        st.info("Informe o valor de compra e o valor atual de referência para calcular a valorização real do imóvel.")
+        return
+
+    elapsed_days = max((date.today() - pd.to_datetime(purchase_date).date()).days, 1)
+    elapsed_years = max(elapsed_days / 365.25, 1 / 12)
+    elapsed_months = elapsed_years * 12
+    nominal_gain = current_value - purchase_price
+    nominal_gain_pct = nominal_gain / purchase_price * 100
+    annualized_nominal_pct = ((current_value / purchase_price) ** (1 / elapsed_years) - 1) * 100
+    inflation_adjusted_purchase = purchase_price * ((1 + inflation_rate / 100) ** elapsed_years)
+    real_gain = current_value - inflation_adjusted_purchase
+    real_gain_pct = real_gain / inflation_adjusted_purchase * 100 if inflation_adjusted_purchase else 0
+    monthly_gain = nominal_gain / elapsed_months
+    current_m2 = current_value / area_m2 if area_m2 else 0
+    purchase_m2 = purchase_price / area_m2 if area_m2 else 0
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Valor de compra", money(purchase_price))
+    m2.metric("Valor atual", money(current_value), delta=f"{nominal_gain_pct:+.1f}%")
+    m3.metric("Ganho/perda real", money(real_gain), delta=f"{real_gain_pct:+.1f}%")
+    m4.metric("Variação mensal", money(monthly_gain))
+
+    rows = [
+        {
+            "Imóvel": property_label or "Imóvel",
+            "Fonte": reference_source,
+            "Meses": f"{elapsed_months:.1f}",
+            "Valorização nominal": f"{annualized_nominal_pct:.1f}% a.a.",
+            "Valor corrigido pela inflação": money(inflation_adjusted_purchase),
+            "Leitura": "ganhou poder de compra" if real_gain >= 0 else "perdeu para a inflação",
+        }
+    ]
+    if area_m2:
+        rows[0]["Compra por m²"] = money(purchase_m2)
+        rows[0]["Atual por m²"] = money(current_m2)
+
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.caption(
+        "FipeZAP e anúncios ajudam como referência, mas imóvel depende de localização, liquidez, padrão, estado de conservação, condomínio, vaga, andar e negociação."
+    )
+
+
 def render_analysis_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
     st.subheader("Análises")
     st.write("Compare sua cesta com referências de mercado, veja economias por estoque em uso e entenda a leitura pelos grupos IPCA.")
 
     view = st.radio(
         "Escolha a análise",
-        ["Média de mercado", "Economia", "Grupos IPCA", "Veículo"],
+        ["Média de mercado", "Economia", "Grupos IPCA", "Veículo", "Imóvel"],
         horizontal=True,
         label_visibility="collapsed",
         key="analysis_view",
@@ -2390,8 +2466,10 @@ def render_analysis_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
         render_stock_savings(receipts, items)
     elif view == "Grupos IPCA":
         render_ipca_groups_guide(receipts, items)
-    else:
+    elif view == "Veículo":
         render_vehicle_depreciation()
+    else:
+        render_property_valuation(items)
 
 
 def render_history(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
