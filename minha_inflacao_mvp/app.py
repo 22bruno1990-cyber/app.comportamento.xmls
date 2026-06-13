@@ -1083,6 +1083,154 @@ def import_backup_bytes(raw: bytes) -> tuple[int, int, int]:
     return imported_receipts, imported_items, len(rules)
 
 
+def month_options_from_items(items: pd.DataFrame) -> list[str]:
+    if items.empty:
+        return [pd.Timestamp(date.today()).to_period("M").strftime("%Y-%m")]
+    return sorted(items["month"].dropna().unique(), reverse=True)
+
+
+def monthly_report_tables(receipts: pd.DataFrame, items: pd.DataFrame, month: str) -> dict[str, pd.DataFrame]:
+    if items.empty:
+        return {"Resumo": pd.DataFrame([{"Mensagem": "Sem dados para gerar relatório."}])}
+
+    month_items = items[items["month"] == month].copy()
+    month_receipts = receipts[receipts["purchase_date"].dt.to_period("M").astype(str) == month].copy()
+
+    total_spend = float(month_items["total_price"].sum()) if not month_items.empty else 0.0
+    receipt_count = int(month_items["receipt_id"].nunique()) if not month_items.empty else 0
+    average_ticket = total_spend / receipt_count if receipt_count else 0.0
+    product_count = int(month_items["normalized_name"].nunique()) if not month_items.empty else 0
+
+    comparison = build_personal_vs_market(items)
+    if not comparison.empty:
+        comparison_month = comparison[comparison["latest_date"].dt.to_period("M").astype(str) == month].copy()
+    else:
+        comparison_month = pd.DataFrame()
+    if not comparison_month.empty:
+        weights = comparison_month["latest_unit_price"].clip(lower=0.01)
+        my_avg = float((comparison_month["my_rate_pct"] * weights).sum() / weights.sum())
+        market_avg = float((comparison_month["market_rate_pct"] * weights).sum() / weights.sum())
+        gap = my_avg - market_avg
+    else:
+        my_avg = market_avg = gap = 0.0
+
+    savings = estimate_stock_savings(receipts, items) if receipts["id"].nunique() >= 2 else pd.DataFrame()
+    if not savings.empty:
+        savings_month = savings[savings["period_date"].dt.to_period("M").astype(str) == month].copy()
+    else:
+        savings_month = pd.DataFrame()
+    savings_total = float(savings_month["avoided_total"].sum()) if not savings_month.empty else 0.0
+
+    summary = pd.DataFrame(
+        [
+            {"Indicador": "Mês analisado", "Valor": month},
+            {"Indicador": "Gasto registrado", "Valor": total_spend},
+            {"Indicador": "Cupons no mês", "Valor": receipt_count},
+            {"Indicador": "Ticket médio", "Valor": average_ticket},
+            {"Indicador": "Produtos acompanhados", "Valor": product_count},
+            {"Indicador": "Minha inflação média em itens repetidos", "Valor": my_avg},
+            {"Indicador": "Média de mercado no mesmo período", "Valor": market_avg},
+            {"Indicador": "Diferença vs mercado (p.p.)", "Valor": gap},
+            {"Indicador": "Economia estimada por estoque em uso", "Valor": savings_total},
+        ]
+    )
+
+    categories = (
+        month_items.groupby(["category", "ipca_group"], as_index=False)
+        .agg(total=("total_price", "sum"), itens=("id", "count"), produtos=("normalized_name", "nunique"))
+        .sort_values("total", ascending=False)
+        if not month_items.empty
+        else pd.DataFrame(columns=["category", "ipca_group", "total", "itens", "produtos"])
+    )
+    products = (
+        month_items.groupby(["normalized_name", "category"], as_index=False)
+        .agg(total=("total_price", "sum"), quantidade=("quantity", "sum"), preco_medio=("unit_price", "mean"), compras=("receipt_id", "nunique"))
+        .sort_values("total", ascending=False)
+        if not month_items.empty
+        else pd.DataFrame(columns=["normalized_name", "category", "total", "quantidade", "preco_medio", "compras"])
+    )
+
+    receipts_export = month_receipts.copy()
+    if not receipts_export.empty:
+        receipts_export["purchase_date"] = receipts_export["purchase_date"].dt.strftime("%d/%m/%Y")
+
+    items_export = month_items.copy()
+    if not items_export.empty:
+        items_export["purchase_date"] = items_export["purchase_date"].dt.strftime("%d/%m/%Y")
+        items_export = items_export[
+            [
+                "purchase_date",
+                "merchant",
+                "product_name",
+                "normalized_name",
+                "category",
+                "ipca_group",
+                "quantity",
+                "unit",
+                "unit_price",
+                "total_price",
+            ]
+        ]
+
+    if not comparison_month.empty:
+        comparison_month = comparison_month.sort_values("difference_pct", ascending=False).copy()
+        comparison_month["first_date"] = comparison_month["first_date"].dt.strftime("%d/%m/%Y")
+        comparison_month["latest_date"] = comparison_month["latest_date"].dt.strftime("%d/%m/%Y")
+
+    if not savings_month.empty:
+        savings_month = savings_month.sort_values("avoided_total", ascending=False).copy()
+        savings_month["period_date"] = savings_month["period_date"].dt.strftime("%d/%m/%Y")
+        savings_month["last_purchase_date"] = savings_month["last_purchase_date"].dt.strftime("%d/%m/%Y")
+
+    patrimony_template = pd.DataFrame(
+        [
+            {
+                "Tipo": "Veículo ou Imóvel",
+                "Bem": "",
+                "Data de compra": "",
+                "Valor de compra": "",
+                "Referência atual": "FIPE, FipeZAP, anúncio, laudo ou avaliação",
+                "Valor atual": "",
+                "Depreciação/valorização": "",
+                "Observações": "",
+            }
+        ]
+    )
+
+    return {
+        "Resumo": summary,
+        "Categorias": categories,
+        "Produtos": products,
+        "Cupons": receipts_export,
+        "Itens": items_export,
+        "Mercado": comparison_month,
+        "Economia": savings_month,
+        "Patrimonio_Modelo": patrimony_template,
+    }
+
+
+def build_monthly_excel_report(receipts: pd.DataFrame, items: pd.DataFrame, month: str) -> bytes:
+    output = BytesIO()
+    tables = monthly_report_tables(receipts, items, month)
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for sheet_name, table in tables.items():
+            safe_name = sheet_name[:31]
+            table.to_excel(writer, sheet_name=safe_name, index=False)
+            worksheet = writer.sheets[safe_name]
+            worksheet.freeze_panes = "A2"
+            for column_cells in worksheet.columns:
+                values = [str(cell.value) if cell.value is not None else "" for cell in column_cells]
+                width = min(max(max((len(value) for value in values), default=10) + 2, 12), 42)
+                worksheet.column_dimensions[column_cells[0].column_letter].width = width
+    output.seek(0)
+    return output.getvalue()
+
+
+def build_monthly_summary_csv(receipts: pd.DataFrame, items: pd.DataFrame, month: str) -> bytes:
+    summary = monthly_report_tables(receipts, items, month)["Resumo"]
+    return summary.to_csv(index=False, sep=";").encode("utf-8-sig")
+
+
 def render_metrics(receipts: pd.DataFrame, items: pd.DataFrame, all_items: pd.DataFrame) -> None:
     total_spend = items["total_price"].sum() if not items.empty else 0
     receipt_count = items["receipt_id"].nunique() if not items.empty else 0
@@ -2527,7 +2675,7 @@ def render_data_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
 
     view = st.radio(
         "Escolha a área de dados",
-        ["Despesa manual", "Ajustar dados", "Histórico", "Backup"],
+        ["Despesa manual", "Ajustar dados", "Histórico", "Relatório mensal", "Backup"],
         horizontal=True,
         label_visibility="collapsed",
         key="data_view",
@@ -2539,8 +2687,41 @@ def render_data_hub(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
         render_data_editor(receipts, items)
     elif view == "Histórico":
         render_history(receipts, items)
+    elif view == "Relatório mensal":
+        render_monthly_report_export(receipts, items)
     else:
         render_backup_tools()
+
+
+def render_monthly_report_export(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    st.subheader("Relatório mensal")
+    st.write(
+        "Exporte uma visão agrupada do mês com resumo, categorias, produtos, cupons, itens, comparação de mercado, economia estimada e modelo de patrimônio."
+    )
+
+    months = month_options_from_items(items)
+    selected_month = st.selectbox("Mês analisado", months)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            "Baixar Excel completo",
+            data=build_monthly_excel_report(receipts, items, selected_month),
+            file_name=f"minha-inflacao-relatorio-{selected_month}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with col2:
+        st.download_button(
+            "Baixar CSV do resumo",
+            data=build_monthly_summary_csv(receipts, items, selected_month),
+            file_name=f"minha-inflacao-resumo-{selected_month}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    preview = monthly_report_tables(receipts, items, selected_month)["Resumo"]
+    st.dataframe(preview, use_container_width=True, hide_index=True)
 
 
 def render_backup_tools() -> None:
