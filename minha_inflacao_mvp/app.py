@@ -1893,7 +1893,7 @@ def render_ipca_groups_guide(receipts: pd.DataFrame, items: pd.DataFrame) -> Non
         )
 
 
-def render_importer() -> None:
+def render_cover() -> None:
     st.markdown(
         """
         <section class="mi-cover">
@@ -1921,6 +1921,26 @@ def render_importer() -> None:
         unsafe_allow_html=True,
     )
 
+
+def render_home(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
+    render_cover()
+
+    if receipts.empty or items.empty:
+        st.info("Comece importando seu primeiro cupom. Depois disso, o app libera o dashboard, as comparações e o plano anual.")
+        return
+
+    latest_date = receipts["purchase_date"].max()
+    latest_label = latest_date.strftime("%d/%m/%Y") if pd.notna(latest_date) else "-"
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Cupons salvos", int(receipts["id"].nunique()))
+    col2.metric("Itens acompanhados", int(items["normalized_name"].nunique()))
+    col3.metric("Última compra", latest_label)
+
+    st.caption("Use o Dashboard para enxergar o que pesou, o Plano anual para proteger seu poder de compra e Análises para comparar com mercado, estoque e grupos IPCA.")
+
+
+def render_importer() -> None:
     st.subheader("Importar cupom pelo QR Code")
     st.caption("Cole aqui o link aberto pelo QR Code da NFC-e. Quando a SEFAZ entregar os itens na pagina, o app importa tudo em formato revisavel.")
 
@@ -2165,10 +2185,13 @@ def main() -> None:
     render_light_theme_css()
     init_db()
 
-    tab_import, tab_dashboard, tab_plan, tab_analysis, tab_data = st.tabs(
-        ["Importar", "Dashboard", "Plano anual", "Análises", "Dados"]
+    tab_home, tab_import, tab_dashboard, tab_plan, tab_analysis, tab_data = st.tabs(
+        ["Início", "Importar", "Dashboard", "Plano anual", "Análises", "Dados"]
     )
     receipts, items = load_history()
+
+    with tab_home:
+        render_home(receipts, items)
 
     with tab_import:
         render_importer()
