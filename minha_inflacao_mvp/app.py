@@ -323,7 +323,7 @@ def render_light_theme_css() -> None:
             display: grid;
             grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
             gap: 24px;
-            align-items: center;
+            align-items: stretch;
             padding: 30px;
             margin: 10px 0 28px;
             border: 1px solid var(--mi-line);
@@ -364,15 +364,23 @@ def render_light_theme_css() -> None:
             line-height: 1.55;
             max-width: 720px;
         }
-        .mi-cover__visual {
-            min-height: 330px;
-            aspect-ratio: 16 / 10;
-            border-radius: 12px;
+        .mi-cover__visual-card {
+            display: flex;
+            min-height: 100%;
+            padding: 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.82);
             border: 1px solid var(--mi-line);
+        }
+        .mi-cover__visual {
+            width: 100%;
+            min-height: 100%;
+            border-radius: 8px;
+            border: 1px solid #edf0f2;
             background:
                 linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.20)),
                 url("{{HERO_IMAGE}}") 74% 52% / cover no-repeat;
-            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 12px 30px rgba(31, 41, 51, 0.08);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
         }
         .mi-cover__panel {
             display: grid;
@@ -422,6 +430,9 @@ def render_light_theme_css() -> None:
                 padding: 22px;
                 background:
                     linear-gradient(135deg, #ffffff 0%, #f7fbf8 100%);
+            }
+            .mi-cover__visual-card {
+                min-height: 260px;
             }
             .mi-cover__visual {
                 min-height: 220px;
@@ -1949,7 +1960,9 @@ def render_cover() -> None:
               </div>
             </div>
           </div>
-          <div class="mi-cover__visual" aria-label="Gráfico de inflação e cupom fiscal"></div>
+          <div class="mi-cover__visual-card">
+            <div class="mi-cover__visual" aria-label="Gráfico de inflação e cupom fiscal"></div>
+          </div>
         </section>
         """,
         unsafe_allow_html=True,
