@@ -737,12 +737,20 @@ def decode_qr_image(uploaded_file) -> str:
             return cv2.rotate(candidate, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return candidate
 
+    def fit_max_dimension(candidate, max_dimension: int = 1800):
+        height, width = candidate.shape[:2]
+        largest_side = max(height, width)
+        if largest_side <= max_dimension:
+            return candidate
+        scale = max_dimension / largest_side
+        return cv2.resize(candidate, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
     def resized(candidate, scale: float):
         if scale == 1:
             return candidate
         height, width = candidate.shape[:2]
-        if max(height, width) * scale > 3600:
-            return candidate
+        if max(height, width) * scale > 2600:
+            return None
         return cv2.resize(candidate, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
     def candidates_from(candidate):
@@ -761,13 +769,15 @@ def decode_qr_image(uploaded_file) -> str:
         return [candidate, gray, equalized, threshold, sharp]
 
     image = Image.open(BytesIO(uploaded_file.getvalue())).convert("RGB")
-    array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    array = fit_max_dimension(cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
     detector = cv2.QRCodeDetector()
 
     for angle in [0, 90, 180, 270]:
         rotated = rotate_image(array, angle)
-        for scale in [1, 1.5, 2, 3]:
+        for scale in [1, 1.4, 2]:
             scaled = resized(rotated, scale)
+            if scaled is None:
+                continue
             for candidate in candidates_from(scaled):
                 decoded = first_decoded(candidate)
                 if decoded:
