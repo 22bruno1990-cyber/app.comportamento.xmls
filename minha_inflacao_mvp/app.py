@@ -713,13 +713,70 @@ def decode_qr_image(uploaded_file) -> str:
             "Por enquanto, abra o QR Code no celular e cole o link aqui."
         ) from exc
 
+    def first_decoded(candidate) -> str:
+        decoded, _, _ = detector.detectAndDecode(candidate)
+        if decoded and decoded.strip():
+            return decoded.strip()
+
+        try:
+            found, decoded_info, _, _ = detector.detectAndDecodeMulti(candidate)
+        except cv2.error:
+            found, decoded_info = False, []
+        if found:
+            for info in decoded_info:
+                if info and str(info).strip():
+                    return str(info).strip()
+        return ""
+
+    def rotate_image(candidate, angle: int):
+        if angle == 90:
+            return cv2.rotate(candidate, cv2.ROTATE_90_CLOCKWISE)
+        if angle == 180:
+            return cv2.rotate(candidate, cv2.ROTATE_180)
+        if angle == 270:
+            return cv2.rotate(candidate, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        return candidate
+
+    def resized(candidate, scale: float):
+        if scale == 1:
+            return candidate
+        height, width = candidate.shape[:2]
+        if max(height, width) * scale > 3600:
+            return candidate
+        return cv2.resize(candidate, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+    def candidates_from(candidate):
+        gray = cv2.cvtColor(candidate, cv2.COLOR_BGR2GRAY) if len(candidate.shape) == 3 else candidate
+        equalized = cv2.equalizeHist(gray)
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+        threshold = cv2.adaptiveThreshold(
+            blurred,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            31,
+            5,
+        )
+        sharp = cv2.addWeighted(gray, 1.6, cv2.GaussianBlur(gray, (0, 0), 3), -0.6, 0)
+        return [candidate, gray, equalized, threshold, sharp]
+
     image = Image.open(BytesIO(uploaded_file.getvalue())).convert("RGB")
     array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     detector = cv2.QRCodeDetector()
-    decoded, _, _ = detector.detectAndDecode(array)
-    if not decoded:
-        raise ValueError("Nao encontrei um QR Code legivel nessa imagem.")
-    return decoded
+
+    for angle in [0, 90, 180, 270]:
+        rotated = rotate_image(array, angle)
+        for scale in [1, 1.5, 2, 3]:
+            scaled = resized(rotated, scale)
+            for candidate in candidates_from(scaled):
+                decoded = first_decoded(candidate)
+                if decoded:
+                    return decoded
+
+    raise ValueError(
+        "Nao encontrei um QR Code legivel nessa imagem. "
+        "Tente uma foto mais próxima do QR Code, sem sombra/reflexo, com o código inteiro aparecendo e ocupando boa parte da imagem."
+    )
 
 
 def receipt_fingerprint(receipt: Receipt) -> str:
