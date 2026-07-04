@@ -1602,11 +1602,12 @@ def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
 
     st.subheader("Caminho da inflação dos itens repetidos")
     st.caption(
-        "Cada linha começa em 0% na primeira compra daquele produto e mostra quanto o preço unitário caminhou nos cupons seguintes."
+        "Cada linha começa no preço unitário real da primeira compra daquele produto e mostra o caminho do valor nos cupons seguintes."
     )
     chart_data = history.copy().sort_values(["purchase_date", "normalized_name"])
     chart_data["date_label"] = chart_data["purchase_date"].dt.strftime("%d/%m/%Y")
     chart_data["inflation_label"] = chart_data["inflation_pct"].map(lambda value: f"{value:.1f}%")
+    chart_data["price_label"] = chart_data["unit_price"].map(money)
     date_order = chart_data.sort_values("purchase_date")["date_label"].drop_duplicates().tolist()
 
     chart = (
@@ -1614,12 +1615,12 @@ def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
         .mark_line(point=True, strokeWidth=2)
         .encode(
             x=alt.X("date_label:N", sort=date_order, title="Data da compra"),
-            y=alt.Y("inflation_pct:Q", title="Inflação desde a primeira compra (%)"),
+            y=alt.Y("unit_price:Q", title="Preço unitário pago (R$)"),
             color=alt.Color("normalized_name:N", title="Produto"),
             tooltip=[
                 alt.Tooltip("date_label:N", title="Data"),
                 alt.Tooltip("normalized_name:N", title="Produto"),
-                alt.Tooltip("unit_price:Q", title="Preço unitário (R$)", format=".2f"),
+                alt.Tooltip("price_label:N", title="Preço unitário"),
                 alt.Tooltip("inflation_label:N", title="Variação acumulada"),
             ],
         )
