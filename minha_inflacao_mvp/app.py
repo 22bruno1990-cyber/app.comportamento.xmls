@@ -1525,6 +1525,13 @@ def render_product_explorer(items: pd.DataFrame) -> None:
             )[["normalized_name", "category", "total_price", "avg_unit_price", "share"]],
             use_container_width=True,
             hide_index=True,
+            column_config={
+                "normalized_name": "Produto",
+                "category": "Categoria",
+                "total_price": "Gasto total",
+                "avg_unit_price": "Preço médio",
+                "share": "Peso na compra",
+            },
         )
 
     default_products = top["normalized_name"].head(3).tolist()
@@ -1539,6 +1546,79 @@ def render_product_explorer(items: pd.DataFrame) -> None:
             aggfunc="mean",
         )
         st.line_chart(pivot)
+
+
+def build_repeated_item_inflation_path(items: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if items.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    history = (
+        items.groupby(["raw_key", "purchase_date"], as_index=False)
+        .agg(
+            normalized_name=("normalized_name", "first"),
+            category=("category", "first"),
+            unit_price=("unit_price", "mean"),
+            receipt_id=("receipt_id", "first"),
+        )
+        .sort_values(["raw_key", "purchase_date", "receipt_id"])
+    )
+    repeated_keys = history.groupby("raw_key")["purchase_date"].nunique()
+    repeated_keys = repeated_keys[repeated_keys >= 2].index
+    history = history[history["raw_key"].isin(repeated_keys)].copy()
+    if history.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    history["first_unit_price"] = history.groupby("raw_key")["unit_price"].transform("first")
+    history = history[history["first_unit_price"] > 0].copy()
+    history["inflation_pct"] = ((history["unit_price"] / history["first_unit_price"]) - 1) * 100
+
+    summary_rows = []
+    for _, item_history in history.groupby("raw_key"):
+        item_history = item_history.sort_values(["purchase_date", "receipt_id"])
+        first = item_history.iloc[0]
+        latest = item_history.iloc[-1]
+        summary_rows.append(
+            {
+                "Produto": latest["normalized_name"],
+                "Categoria": latest["category"],
+                "Primeira compra": first["purchase_date"],
+                "Última compra": latest["purchase_date"],
+                "Preço inicial": first["unit_price"],
+                "Preço atual": latest["unit_price"],
+                "Inflação acumulada": latest["inflation_pct"],
+            }
+        )
+
+    summary = pd.DataFrame(summary_rows).sort_values("Inflação acumulada", ascending=False)
+    return history, summary
+
+
+def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
+    history, summary = build_repeated_item_inflation_path(items)
+    if history.empty:
+        st.info("Ainda não há itens repetidos em cupons diferentes para desenhar a trilha de inflação item a item.")
+        return
+
+    st.subheader("Caminho da inflação dos itens repetidos")
+    st.caption(
+        "Cada linha começa em 0% na primeira compra daquele produto e mostra quanto o preço unitário caminhou nos cupons seguintes."
+    )
+    chart_data = history.pivot_table(
+        index="purchase_date",
+        columns="normalized_name",
+        values="inflation_pct",
+        aggfunc="mean",
+    ).sort_index()
+    st.line_chart(chart_data)
+
+    with st.expander("Ver resumo dos itens repetidos"):
+        display = summary.copy()
+        display["Primeira compra"] = display["Primeira compra"].dt.strftime("%d/%m/%Y")
+        display["Última compra"] = display["Última compra"].dt.strftime("%d/%m/%Y")
+        display["Preço inicial"] = display["Preço inicial"].map(money)
+        display["Preço atual"] = display["Preço atual"].map(money)
+        display["Inflação acumulada"] = display["Inflação acumulada"].map(lambda value: f"{value:.1f}%")
+        st.dataframe(display, use_container_width=True, hide_index=True)
 
 
 def estimate_stock_savings(receipts: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
@@ -1887,9 +1967,16 @@ def render_dashboard(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
             ),
             use_container_width=True,
             hide_index=True,
+            column_config={
+                "category": "Categoria",
+                "total_price": "Gasto total",
+                "share": "Peso na compra",
+            },
         )
 
     render_product_explorer(filtered)
+    st.divider()
+    render_repeated_item_inflation_path(filtered)
 
     ranking = (
         filtered.groupby(["normalized_name", "month"], as_index=False)["unit_price"]
@@ -1902,15 +1989,21 @@ def render_dashboard(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
     movers = ranking[(ranking["month"] == latest_month) & ranking["change_pct"].notna()]
     movers = movers.sort_values("change_pct", ascending=False).head(10)
     if not movers.empty:
-        st.subheader("Itens que mais subiram no ultimo mês importado")
+        st.subheader("Itens que mais subiram no último mês importado")
+        movers_display = movers[["normalized_name", "unit_price", "prev_price", "change_pct"]].copy()
+        movers_display["unit_price"] = movers_display["unit_price"].map(money)
+        movers_display["prev_price"] = movers_display["prev_price"].map(money)
+        movers_display["change_pct"] = movers_display["change_pct"].map(lambda value: f"{value:.1f}%")
         st.dataframe(
-            movers[["normalized_name", "unit_price", "prev_price", "change_pct"]].assign(
-                unit_price=movers["unit_price"].map(money),
-                prev_price=movers["prev_price"].map(money),
-                change_pct=movers["change_pct"].map(lambda value: f"{value:.1f}%"),
-            ),
+            movers_display,
             use_container_width=True,
             hide_index=True,
+            column_config={
+                "normalized_name": "Produto",
+                "unit_price": "Preço atual",
+                "prev_price": "Preço anterior",
+                "change_pct": "Variação",
+            },
         )
 
 def compound_rate(*rates: float) -> float:
