@@ -1580,6 +1580,7 @@ def build_repeated_item_inflation_path(items: pd.DataFrame) -> tuple[pd.DataFram
         latest = item_history.iloc[-1]
         summary_rows.append(
             {
+                "raw_key": latest["raw_key"],
                 "Produto": latest["normalized_name"],
                 "Categoria": latest["category"],
                 "Primeira compra": first["purchase_date"],
@@ -1617,7 +1618,7 @@ def build_repeated_item_price_chart(chart_data: pd.DataFrame, date_order: list[s
                 scale=alt.Scale(domain=[price_floor, price_ceiling], nice=False),
                 axis=alt.Axis(values=price_ticks, format=".0f", tickMinStep=1),
             ),
-            color=alt.Color("normalized_name:N", title="Produto"),
+            color=alt.value("#1f6f64"),
             tooltip=[
                 alt.Tooltip("date_label:N", title="Data"),
                 alt.Tooltip("normalized_name:N", title="Produto"),
@@ -1629,42 +1630,57 @@ def build_repeated_item_price_chart(chart_data: pd.DataFrame, date_order: list[s
     )
 
 
-@st.dialog("Caminho dos preços por cupom", width="large")
-def render_repeated_item_chart_dialog(chart_data: pd.DataFrame, date_order: list[str]) -> None:
-    st.caption("Visualização ampliada com escala de R$ 1 no eixo de preço unitário pago.")
-    chart = build_repeated_item_price_chart(chart_data, date_order, height=650)
-    st.altair_chart(chart, use_container_width=True)
-
-
 def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
     history, summary = build_repeated_item_inflation_path(items)
     if history.empty:
         st.info("Ainda não há itens repetidos em cupons diferentes para desenhar a trilha de inflação item a item.")
         return
 
-    st.subheader("Caminho da inflação dos itens repetidos")
+    st.subheader("Caminho individual dos itens repetidos")
     st.caption(
-        "Cada linha começa no preço unitário real da primeira compra daquele produto e mostra o caminho do valor nos cupons seguintes."
+        "Escolha um produto que apareceu em mais de um cupom para ver o preço unitário real em cada compra."
     )
     chart_data = history.copy().sort_values(["purchase_date", "normalized_name"])
     chart_data["date_label"] = chart_data["purchase_date"].dt.strftime("%d/%m/%Y")
     chart_data["inflation_label"] = chart_data["inflation_pct"].map(lambda value: f"{value:.1f}%")
     chart_data["price_label"] = chart_data["unit_price"].map(money)
-    date_order = chart_data.sort_values("purchase_date")["date_label"].drop_duplicates().tolist()
+    summary_lookup = summary.set_index("raw_key", drop=False)
+    product_options = summary["raw_key"].tolist()
+    product_labels = summary_lookup["Produto"].to_dict()
+    selected_key = st.selectbox(
+        "Item repetido",
+        product_options,
+        format_func=lambda key: product_labels.get(key, key),
+        key="repeated_item_selector",
+    )
 
-    chart = build_repeated_item_price_chart(chart_data, date_order)
+    selected_chart_data = chart_data[chart_data["raw_key"] == selected_key].copy()
+    date_order = selected_chart_data.sort_values("purchase_date")["date_label"].drop_duplicates().tolist()
+    selected_summary = summary_lookup.loc[selected_key]
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Preço inicial", money(float(selected_summary["Preço inicial"])))
+    col2.metric("Preço atual", money(float(selected_summary["Preço atual"])))
+    col3.metric("Variação acumulada", f"{float(selected_summary['Inflação acumulada']):.1f}%")
+
+    chart = build_repeated_item_price_chart(selected_chart_data, date_order, height=500)
     st.altair_chart(chart, use_container_width=True)
-    if st.button("Expandir gráfico", use_container_width=True):
-        render_repeated_item_chart_dialog(chart_data, date_order)
 
-    with st.expander("Ver resumo dos itens repetidos"):
-        display = summary.copy()
-        display["Primeira compra"] = display["Primeira compra"].dt.strftime("%d/%m/%Y")
-        display["Última compra"] = display["Última compra"].dt.strftime("%d/%m/%Y")
-        display["Preço inicial"] = display["Preço inicial"].map(money)
-        display["Preço atual"] = display["Preço atual"].map(money)
-        display["Inflação acumulada"] = display["Inflação acumulada"].map(lambda value: f"{value:.1f}%")
-        st.dataframe(display, use_container_width=True, hide_index=True)
+    with st.expander("Ver compras deste item"):
+        display = selected_chart_data[["purchase_date", "unit_price", "inflation_pct"]].copy()
+        display["purchase_date"] = display["purchase_date"].dt.strftime("%d/%m/%Y")
+        display["unit_price"] = display["unit_price"].map(money)
+        display["inflation_pct"] = display["inflation_pct"].map(lambda value: f"{value:.1f}%")
+        st.dataframe(
+            display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "purchase_date": "Data da compra",
+                "unit_price": "Preço unitário",
+                "inflation_pct": "Variação desde a primeira compra",
+            },
+        )
 
 
 def estimate_stock_savings(receipts: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
