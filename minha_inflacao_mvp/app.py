@@ -1594,6 +1594,48 @@ def build_repeated_item_inflation_path(items: pd.DataFrame) -> tuple[pd.DataFram
     return history, summary
 
 
+def build_repeated_item_price_chart(chart_data: pd.DataFrame, date_order: list[str], height: int = 430) -> alt.Chart:
+    min_price = float(chart_data["unit_price"].min())
+    max_price = float(chart_data["unit_price"].max())
+    price_floor = max(0, int(min_price) - 1)
+    price_ceiling = int(max_price) + 2
+    price_ticks = list(range(price_floor, price_ceiling + 1))
+
+    return (
+        alt.Chart(chart_data)
+        .mark_line(point=True, strokeWidth=2.5)
+        .encode(
+            x=alt.X(
+                "date_label:N",
+                sort=date_order,
+                title="Data da compra",
+                axis=alt.Axis(labelAngle=-45),
+            ),
+            y=alt.Y(
+                "unit_price:Q",
+                title="Preço unitário pago (R$)",
+                scale=alt.Scale(domain=[price_floor, price_ceiling], nice=False),
+                axis=alt.Axis(values=price_ticks, format=".0f", tickMinStep=1),
+            ),
+            color=alt.Color("normalized_name:N", title="Produto"),
+            tooltip=[
+                alt.Tooltip("date_label:N", title="Data"),
+                alt.Tooltip("normalized_name:N", title="Produto"),
+                alt.Tooltip("price_label:N", title="Preço unitário"),
+                alt.Tooltip("inflation_label:N", title="Variação acumulada"),
+            ],
+        )
+        .properties(height=height)
+    )
+
+
+@st.dialog("Caminho dos preços por cupom", width="large")
+def render_repeated_item_chart_dialog(chart_data: pd.DataFrame, date_order: list[str]) -> None:
+    st.caption("Visualização ampliada com escala de R$ 1 no eixo de preço unitário pago.")
+    chart = build_repeated_item_price_chart(chart_data, date_order, height=650)
+    st.altair_chart(chart, use_container_width=True)
+
+
 def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
     history, summary = build_repeated_item_inflation_path(items)
     if history.empty:
@@ -1610,23 +1652,10 @@ def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
     chart_data["price_label"] = chart_data["unit_price"].map(money)
     date_order = chart_data.sort_values("purchase_date")["date_label"].drop_duplicates().tolist()
 
-    chart = (
-        alt.Chart(chart_data)
-        .mark_line(point=True, strokeWidth=2)
-        .encode(
-            x=alt.X("date_label:N", sort=date_order, title="Data da compra"),
-            y=alt.Y("unit_price:Q", title="Preço unitário pago (R$)"),
-            color=alt.Color("normalized_name:N", title="Produto"),
-            tooltip=[
-                alt.Tooltip("date_label:N", title="Data"),
-                alt.Tooltip("normalized_name:N", title="Produto"),
-                alt.Tooltip("price_label:N", title="Preço unitário"),
-                alt.Tooltip("inflation_label:N", title="Variação acumulada"),
-            ],
-        )
-        .properties(height=430)
-    )
+    chart = build_repeated_item_price_chart(chart_data, date_order)
     st.altair_chart(chart, use_container_width=True)
+    if st.button("Expandir gráfico", use_container_width=True):
+        render_repeated_item_chart_dialog(chart_data, date_order)
 
     with st.expander("Ver resumo dos itens repetidos"):
         display = summary.copy()
