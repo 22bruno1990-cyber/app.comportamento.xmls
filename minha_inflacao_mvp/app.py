@@ -10,6 +10,7 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import altair as alt
 import pandas as pd
 import requests
 import streamlit as st
@@ -1603,13 +1604,28 @@ def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
     st.caption(
         "Cada linha começa em 0% na primeira compra daquele produto e mostra quanto o preço unitário caminhou nos cupons seguintes."
     )
-    chart_data = history.pivot_table(
-        index="purchase_date",
-        columns="normalized_name",
-        values="inflation_pct",
-        aggfunc="mean",
-    ).sort_index()
-    st.line_chart(chart_data)
+    chart_data = history.copy().sort_values(["purchase_date", "normalized_name"])
+    chart_data["date_label"] = chart_data["purchase_date"].dt.strftime("%d/%m/%Y")
+    chart_data["inflation_label"] = chart_data["inflation_pct"].map(lambda value: f"{value:.1f}%")
+    date_order = chart_data.sort_values("purchase_date")["date_label"].drop_duplicates().tolist()
+
+    chart = (
+        alt.Chart(chart_data)
+        .mark_line(point=True, strokeWidth=2)
+        .encode(
+            x=alt.X("date_label:N", sort=date_order, title="Data da compra"),
+            y=alt.Y("inflation_pct:Q", title="Inflação desde a primeira compra (%)"),
+            color=alt.Color("normalized_name:N", title="Produto"),
+            tooltip=[
+                alt.Tooltip("date_label:N", title="Data"),
+                alt.Tooltip("normalized_name:N", title="Produto"),
+                alt.Tooltip("unit_price:Q", title="Preço unitário (R$)", format=".2f"),
+                alt.Tooltip("inflation_label:N", title="Variação acumulada"),
+            ],
+        )
+        .properties(height=430)
+    )
+    st.altair_chart(chart, use_container_width=True)
 
     with st.expander("Ver resumo dos itens repetidos"):
         display = summary.copy()
