@@ -3,4 +3,4 @@ pandas>=2.2,<3
 requests>=2.31,<3
 opencv-python-headless>=4.9,<5
 openpyxl>=3.1,<4
-altair>=5,<6
+plotly>=5.24,<6

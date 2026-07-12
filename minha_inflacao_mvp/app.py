@@ -10,8 +10,8 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import altair as alt
 import pandas as pd
+import plotly.graph_objects as go
 import requests
 import streamlit as st
 
@@ -1595,39 +1595,55 @@ def build_repeated_item_inflation_path(items: pd.DataFrame) -> tuple[pd.DataFram
     return history, summary
 
 
-def build_repeated_item_price_chart(chart_data: pd.DataFrame, date_order: list[str], height: int = 430) -> alt.Chart:
+def build_repeated_item_price_chart(chart_data: pd.DataFrame, date_order: list[str], height: int = 430) -> go.Figure:
     min_price = float(chart_data["unit_price"].min())
     max_price = float(chart_data["unit_price"].max())
     price_floor = max(0, int(min_price) - 1)
     price_ceiling = int(max_price) + 2
     price_ticks = list(range(price_floor, price_ceiling + 1))
 
-    return (
-        alt.Chart(chart_data)
-        .mark_line(point=True, strokeWidth=2.5)
-        .encode(
-            x=alt.X(
-                "date_label:N",
-                sort=date_order,
-                title="Data da compra",
-                axis=alt.Axis(labelAngle=-45),
-            ),
-            y=alt.Y(
-                "unit_price:Q",
-                title="Preço unitário pago (R$)",
-                scale=alt.Scale(domain=[price_floor, price_ceiling], nice=False),
-                axis=alt.Axis(values=price_ticks, format=".0f", tickMinStep=1),
-            ),
-            color=alt.value("#1f6f64"),
-            tooltip=[
-                alt.Tooltip("date_label:N", title="Data"),
-                alt.Tooltip("normalized_name:N", title="Produto"),
-                alt.Tooltip("price_label:N", title="Preço unitário"),
-                alt.Tooltip("inflation_label:N", title="Variação acumulada"),
-            ],
-        )
-        .properties(height=height)
+    figure = go.Figure(
+        data=[
+            go.Scatter(
+                x=chart_data["date_label"],
+                y=chart_data["unit_price"],
+                mode="lines+markers",
+                line={"color": "#1f6f64", "width": 3},
+                marker={"color": "#1f6f64", "size": 9},
+                customdata=chart_data[["normalized_name", "price_label", "inflation_label"]],
+                hovertemplate=(
+                    "Data: %{x}<br>"
+                    "Produto: %{customdata[0]}<br>"
+                    "Preço unitário: %{customdata[1]}<br>"
+                    "Variação acumulada: %{customdata[2]}<extra></extra>"
+                ),
+            )
+        ]
     )
+    figure.update_layout(
+        height=height,
+        margin={"l": 8, "r": 8, "t": 12, "b": 8},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        xaxis={
+            "title": "Data da compra",
+            "categoryorder": "array",
+            "categoryarray": date_order,
+            "tickangle": -45,
+            "showgrid": False,
+        },
+        yaxis={
+            "title": "Preço unitário pago (R$)",
+            "range": [price_floor, price_ceiling],
+            "tickmode": "array",
+            "tickvals": price_ticks,
+            "tickprefix": "R$ ",
+            "showgrid": True,
+            "gridcolor": "rgba(31, 111, 100, 0.12)",
+        },
+    )
+    return figure
 
 
 def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
@@ -1664,7 +1680,7 @@ def render_repeated_item_inflation_path(items: pd.DataFrame) -> None:
     col3.metric("Variação acumulada", f"{float(selected_summary['Inflação acumulada']):.1f}%")
 
     chart = build_repeated_item_price_chart(selected_chart_data, date_order, height=500)
-    st.altair_chart(chart, use_container_width=True)
+    st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
 
     with st.expander("Ver compras deste item"):
         display = selected_chart_data[["purchase_date", "unit_price", "inflation_pct"]].copy()
