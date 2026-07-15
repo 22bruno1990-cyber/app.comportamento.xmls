@@ -1336,10 +1336,12 @@ def render_metrics(receipts: pd.DataFrame, items: pd.DataFrame, all_items: pd.Da
     col2.metric("Gasto registrado", money(total_spend))
     col3.metric("Ticket médio filtrado", money(average_ticket))
 
-    monthly = monthly_basket(all_items)
-    if len(monthly) >= 2:
-        variation = monthly["basket_total"].pct_change().iloc[-1] * 100
-        col4.metric("Inflação mensal registrada", f"{variation:.1f}%")
+    timeline = build_monthly_personal_inflation_timeline(all_items)
+    if not timeline.empty:
+        weights = timeline["items_compared"].clip(lower=1)
+        exact_rate = float((timeline["personal_inflation_pct"] * weights).sum() / weights.sum())
+        latest_rate = float(timeline.iloc[-1]["personal_inflation_pct"])
+        col4.metric("Minha inflação apurada", f"{exact_rate:.2f}%", f"{latest_rate:+.2f}% último mês")
     else:
         col4.metric("Produtos acompanhados", tracked_products)
 
@@ -1349,6 +1351,144 @@ def monthly_basket(items: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["month", "basket_total"])
     monthly = items.groupby("month", as_index=False)["total_price"].sum()
     return monthly.rename(columns={"total_price": "basket_total"})
+
+
+def build_monthly_personal_inflation_timeline(items: pd.DataFrame) -> pd.DataFrame:
+    if items.empty:
+        return pd.DataFrame()
+
+    monthly_items = (
+        items.groupby(["raw_key", "month"], as_index=False)
+        .agg(
+            normalized_name=("normalized_name", "first"),
+            category=("category", "first"),
+            unit_price=("unit_price", "mean"),
+            total_price=("total_price", "sum"),
+            purchase_start=("purchase_date", "min"),
+            purchase_end=("purchase_date", "max"),
+        )
+        .sort_values(["raw_key", "month"])
+    )
+    monthly_items["prev_month"] = monthly_items.groupby("raw_key")["month"].shift(1)
+    monthly_items["prev_unit_price"] = monthly_items.groupby("raw_key")["unit_price"].shift(1)
+    monthly_items["prev_purchase_date"] = monthly_items.groupby("raw_key")["purchase_end"].shift(1)
+    monthly_items["change_pct"] = ((monthly_items["unit_price"] / monthly_items["prev_unit_price"]) - 1) * 100
+    comparable = monthly_items[monthly_items["change_pct"].notna()].copy()
+    comparable = comparable[comparable["prev_unit_price"] > 0]
+    if comparable.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for month, month_data in comparable.groupby("month"):
+        weights = month_data["total_price"].clip(lower=0.01)
+        inflation = float((month_data["change_pct"] * weights).sum() / weights.sum())
+        rows.append(
+            {
+                "month": month,
+                "period_label": pd.Period(month).strftime("%m/%Y"),
+                "personal_inflation_pct": inflation,
+                "items_compared": int(month_data["raw_key"].nunique()),
+                "positive_items": int((month_data["change_pct"] > 0).sum()),
+                "negative_items": int((month_data["change_pct"] < 0).sum()),
+                "neutral_items": int((month_data["change_pct"] == 0).sum()),
+                "first_date": month_data["prev_purchase_date"].min(),
+                "latest_date": month_data["purchase_end"].max(),
+            }
+        )
+    return pd.DataFrame(rows).sort_values("month")
+
+
+def render_personal_inflation_timeline(items: pd.DataFrame) -> None:
+    timeline = build_monthly_personal_inflation_timeline(items)
+    if timeline.empty:
+        st.info("A cronologia da inflação pessoal aparece quando houver itens repetidos em meses diferentes.")
+        return
+
+    weights = timeline["items_compared"].clip(lower=1)
+    exact_rate = float((timeline["personal_inflation_pct"] * weights).sum() / weights.sum())
+    latest = timeline.iloc[-1]
+
+    st.subheader("Cronologia da minha inflação")
+    st.caption(
+        "Trajetória mês a mês calculada apenas com itens que se repetiram em compras de meses diferentes. "
+        "Barras acima de zero indicam alta; barras abaixo de zero indicam redução de preço."
+    )
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Minha inflação apurada", f"{exact_rate:.2f}%")
+    col2.metric("Último mês comparado", latest["period_label"], f"{latest['personal_inflation_pct']:+.2f}%")
+    col3.metric("Itens no último cálculo", int(latest["items_compared"]))
+
+    chart_data = timeline.copy()
+    chart_data["color"] = chart_data["personal_inflation_pct"].apply(lambda value: "#9b2c2c" if value >= 0 else "#1f6f64")
+    chart_data["hover"] = chart_data.apply(
+        lambda row: (
+            f"Mês: {row['period_label']}<br>"
+            f"Inflação pessoal: {row['personal_inflation_pct']:.2f}%<br>"
+            f"Itens comparados: {int(row['items_compared'])}<br>"
+            f"Subiram: {int(row['positive_items'])}<br>"
+            f"Caíram: {int(row['negative_items'])}<br>"
+            f"Compras no período: {row['first_date'].strftime('%d/%m/%Y')} a {row['latest_date'].strftime('%d/%m/%Y')}"
+        ),
+        axis=1,
+    )
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                x=chart_data["period_label"],
+                y=chart_data["personal_inflation_pct"],
+                marker_color=chart_data["color"],
+                customdata=chart_data["hover"],
+                hovertemplate="%{customdata}<extra></extra>",
+            )
+        ]
+    )
+    figure.update_layout(
+        height=360,
+        margin={"l": 8, "r": 8, "t": 12, "b": 8},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        xaxis={"title": "Mês da compra"},
+        yaxis={
+            "title": "Inflação pessoal no mês (%)",
+            "zeroline": True,
+            "zerolinecolor": "rgba(31, 41, 55, 0.45)",
+            "gridcolor": "rgba(31, 111, 100, 0.10)",
+            "ticksuffix": "%",
+        },
+    )
+    st.plotly_chart(figure, use_container_width=True, config={"displayModeBar": False})
+
+    display = timeline.copy()
+    display["first_date"] = display["first_date"].dt.strftime("%d/%m/%Y")
+    display["latest_date"] = display["latest_date"].dt.strftime("%d/%m/%Y")
+    display["personal_inflation_pct"] = display["personal_inflation_pct"].map(lambda value: f"{value:+.2f}%")
+    st.dataframe(
+        display[
+            [
+                "period_label",
+                "first_date",
+                "latest_date",
+                "personal_inflation_pct",
+                "items_compared",
+                "positive_items",
+                "negative_items",
+                "neutral_items",
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "period_label": "Mês",
+            "first_date": "Data base usada",
+            "latest_date": "Data atual usada",
+            "personal_inflation_pct": "Inflação pessoal",
+            "items_compared": "Itens comparados",
+            "positive_items": "Itens que subiram",
+            "negative_items": "Itens que caíram",
+            "neutral_items": "Itens estáveis",
+        },
+    )
 
 
 def filter_items(receipts: pd.DataFrame, items: pd.DataFrame) -> pd.DataFrame:
@@ -2018,6 +2158,9 @@ def render_dashboard(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
     render_metrics(receipts, filtered, items)
 
     st.divider()
+    render_personal_inflation_timeline(filtered)
+
+    st.divider()
     if items["month"].nunique() < 2:
         render_single_period_insights(filtered)
 
@@ -2064,25 +2207,34 @@ def render_dashboard(receipts: pd.DataFrame, items: pd.DataFrame) -> None:
     ranking["prev_price"] = ranking.groupby("normalized_name")["unit_price"].shift(1)
     ranking["change_pct"] = ((ranking["unit_price"] / ranking["prev_price"]) - 1) * 100
     latest_month = ranking["month"].max()
-    movers = ranking[(ranking["month"] == latest_month) & ranking["change_pct"].notna()]
-    movers = movers.sort_values("change_pct", ascending=False).head(10)
+    movers = ranking[(ranking["month"] == latest_month) & ranking["change_pct"].notna()].copy()
     if not movers.empty:
-        st.subheader("Itens que mais subiram no último mês importado")
-        movers_display = movers[["normalized_name", "unit_price", "prev_price", "change_pct"]].copy()
-        movers_display["unit_price"] = movers_display["unit_price"].map(money)
-        movers_display["prev_price"] = movers_display["prev_price"].map(money)
-        movers_display["change_pct"] = movers_display["change_pct"].map(lambda value: f"{value:.1f}%")
-        st.dataframe(
-            movers_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "normalized_name": "Produto",
-                "unit_price": "Preço atual",
-                "prev_price": "Preço anterior",
-                "change_pct": "Variação",
-            },
-        )
+        st.subheader("Altas e reduções no último mês importado")
+
+        def display_movers_table(data: pd.DataFrame) -> None:
+            movers_display = data[["normalized_name", "unit_price", "prev_price", "change_pct"]].copy()
+            movers_display["unit_price"] = movers_display["unit_price"].map(money)
+            movers_display["prev_price"] = movers_display["prev_price"].map(money)
+            movers_display["change_pct"] = movers_display["change_pct"].map(lambda value: f"{value:+.2f}%")
+            st.dataframe(
+                movers_display,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "normalized_name": "Produto",
+                    "unit_price": "Preço atual",
+                    "prev_price": "Preço anterior",
+                    "change_pct": "Variação",
+                },
+            )
+
+        up_col, down_col = st.columns(2)
+        with up_col:
+            st.markdown("**Itens que mais subiram**")
+            display_movers_table(movers.sort_values("change_pct", ascending=False).head(10))
+        with down_col:
+            st.markdown("**Itens que mais caíram**")
+            display_movers_table(movers.sort_values("change_pct", ascending=True).head(10))
 
 def compound_rate(*rates: float) -> float:
     factor = 1.0
@@ -2196,6 +2348,7 @@ def build_personal_vs_market(items: pd.DataFrame) -> pd.DataFrame:
                 "category": latest["category"],
                 "first_date": first["purchase_date"],
                 "latest_date": latest["purchase_date"],
+                "period_days": int((pd.Timestamp(latest["purchase_date"]) - pd.Timestamp(first["purchase_date"])).days),
                 "first_unit_price": first["unit_price"],
                 "latest_unit_price": latest["unit_price"],
                 "my_rate_pct": my_rate,
@@ -2224,9 +2377,9 @@ def render_personal_vs_market(items: pd.DataFrame) -> None:
     gap = my_avg - market_avg
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Minha inflação média", f"{my_avg:.1f}%")
-    col2.metric("Média de mercado no período", f"{market_avg:.1f}%")
-    col3.metric("Diferença", f"{gap:+.1f} p.p.")
+    col1.metric("Minha inflação média", f"{my_avg:.2f}%")
+    col2.metric("Média de mercado no período", f"{market_avg:.2f}%")
+    col3.metric("Diferença", f"{gap:+.2f} p.p.")
 
     st.dataframe(
         comparison.sort_values("difference_pct", ascending=False).assign(
@@ -2234,15 +2387,16 @@ def render_personal_vs_market(items: pd.DataFrame) -> None:
             latest_date=comparison["latest_date"].dt.strftime("%d/%m/%Y"),
             first_unit_price=comparison["first_unit_price"].map(money),
             latest_unit_price=comparison["latest_unit_price"].map(money),
-            my_rate_pct=comparison["my_rate_pct"].map(lambda value: f"{value:.1f}%"),
-            market_rate_pct=comparison["market_rate_pct"].map(lambda value: f"{value:.1f}%"),
-            difference_pct=comparison["difference_pct"].map(lambda value: f"{value:+.1f} p.p."),
+            my_rate_pct=comparison["my_rate_pct"].map(lambda value: f"{value:+.2f}%"),
+            market_rate_pct=comparison["market_rate_pct"].map(lambda value: f"{value:+.2f}%"),
+            difference_pct=comparison["difference_pct"].map(lambda value: f"{value:+.2f} p.p."),
         )[
             [
                 "normalized_name",
                 "category",
                 "first_date",
                 "latest_date",
+                "period_days",
                 "first_unit_price",
                 "latest_unit_price",
                 "my_rate_pct",
@@ -2257,8 +2411,9 @@ def render_personal_vs_market(items: pd.DataFrame) -> None:
         column_config={
             "normalized_name": "Produto",
             "category": "Categoria",
-            "first_date": "Compra anterior",
-            "latest_date": "Compra atual",
+            "first_date": "Data base",
+            "latest_date": "Data atual",
+            "period_days": "Dias comparados",
             "first_unit_price": "Preço anterior",
             "latest_unit_price": "Preço atual",
             "my_rate_pct": "Minha variação",
